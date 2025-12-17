@@ -117,6 +117,14 @@ func Sugar() *zap.SugaredLogger {
 	return sugar
 }
 
+// DefaultStructuredLogger creates a structured logger with default fields
+func DefaultStructuredLogger() *StructuredLogger {
+	return &StructuredLogger{
+		logger: logger,
+		fields: make(map[string]interface{}),
+	}
+}
+
 // GetLevel returns the current log level
 func GetLevel() string {
 	return currentLevel.String()

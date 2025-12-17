@@ -16,6 +16,7 @@ import (
 	"go-admin/internal/handler"
 	"go-admin/internal/logger"
 	"go-admin/internal/middleware"
+	"go-admin/internal/metrics"
 
 	"github.com/gin-gonic/gin"
 )
@@ -48,8 +49,22 @@ func Run() error {
 	// Initialize cache
 	cache.Init(cfg.Cache)
 
+	// Initialize metrics collector
+	metricsCollector := metrics.NewMetricsCollector()
+
 	// Initialize rate limiter
-	rateLimiter = middleware.NewRateLimiter(100, 1*time.Minute)
+	rateLimitConfig := middleware.DefaultRateLimitConfig()
+	rateLimitConfig.Requests = 100
+	rateLimitConfig.Window = 1 * time.Minute
+	rateLimiter = middleware.NewRateLimiter(rateLimitConfig)
+
+	// Initialize response cache
+	cacheConfig := middleware.DefaultCacheConfig()
+	cacheConfig.CacheDuration = 5 * time.Minute
+
+	// Initialize transaction manager
+	db := database.GetDB()
+	transactionManager := database.NewTransactionManager(db)
 
 	// Create gin engine
 	gin.SetMode(gin.ReleaseMode)
@@ -63,10 +78,15 @@ func Run() error {
 	router.Use(middleware.NewRecoveryMiddleware().Handle())
 	router.Use(logger.GinLogger())
 	router.Use(middleware.NewErrorHandlerMiddleware().Handle())
+	router.Use(middleware.QueryPerformanceMiddleware())
+	router.Use(middleware.MetricsMiddleware(metricsCollector))
 	router.Use(rateLimiter.Limit())
+	router.Use(middleware.RequestLoggerMiddleware())
+	router.Use(middleware.ResponseCacheMiddleware(cacheConfig))
+	router.Use(middleware.TransactionMiddleware(transactionManager))
 
 	// Register routes
-	registerRoutes(router)
+	registerRoutes(router, metricsCollector)
 
 	// Create HTTP server
 	srv := &http.Server{
@@ -101,11 +121,21 @@ func Run() error {
 	return nil
 }
 
-func registerRoutes(router *gin.Engine) {
+func registerRoutes(router *gin.Engine, metricsCollector *metrics.MetricsCollector) {
 	// Health check endpoint
-	metricsHandler := handler.NewMetricsHandler()
-	router.GET("/health", metricsHandler.GetHealth)
-	router.GET("/health/detailed", metricsHandler.GetHealthDetailed)
+	metricsHandler := handler.NewMetricsHandler(metricsCollector)
+	router.GET("/health", metricsHandler.GetHealthStatus)
+	router.GET("/health/detailed", metricsHandler.GetSystemMetrics)
+
+	// Metrics endpoints
+	router.GET("/metrics", metricsHandler.GetMetrics)
+	router.GET("/metrics/system", metricsHandler.GetSystemMetrics)
+	router.GET("/metrics/health", metricsHandler.GetHealthStatus)
+	router.GET("/metrics/endpoints", metricsHandler.GetTopEndpoints)
+	router.GET("/metrics/errors", metricsHandler.GetRecentErrors)
+	router.DELETE("/metrics", metricsHandler.ClearMetrics)
+	router.GET("/metrics/path/:path", metricsHandler.GetMetricsByPath)
+	router.GET("/metrics/timerange", metricsHandler.GetMetricsByTimeRange)
 
 	// API version 1 group
 	v1 := router.Group("/api/v1")
@@ -234,6 +264,22 @@ func registerRoutes(router *gin.Engine) {
 			dbHandler := handler.NewDBHandler()
 			protected.GET("/db/stats", dbHandler.GetDBStats)
 
+			// Database performance handlers
+			dbPerfHandler := handler.NewDBPerformanceHandler()
+			protected.GET("/db/performance/stats", dbPerfHandler.GetQueryStats)
+			protected.GET("/db/performance/slow-queries", dbPerfHandler.GetSlowQueries)
+			protected.POST("/db/performance/explain", dbPerfHandler.ExplainQuery)
+			protected.GET("/db/performance/indexes/:table", dbPerfHandler.GetTableIndexes)
+			protected.GET("/db/performance/indexes/:table/analyze", dbPerfHandler.AnalyzeTableIndexes)
+			protected.POST("/db/performance/indexes", dbPerfHandler.CreateIndex)
+			protected.DELETE("/db/performance/indexes/:index", dbPerfHandler.DropIndex)
+			protected.POST("/db/performance/indexes/composite", dbPerfHandler.CreateCompositeIndex)
+			protected.POST("/db/performance/indexes/fulltext", dbPerfHandler.CreateFullTextIndex)
+			protected.POST("/db/performance/indexes/:index/rebuild", dbPerfHandler.RebuildIndex)
+			protected.POST("/db/performance/tables/:table/optimize", dbPerfHandler.OptimizeTable)
+			protected.GET("/db/performance/indexes/usage", dbPerfHandler.GetIndexUsage)
+			protected.GET("/db/performance/tables/:table/suggest-indexes", dbPerfHandler.SuggestMissingIndexes)
+
 			// Log level handlers
 			logLevelHandler := handler.NewLogLevelHandler()
 			protected.GET("/log/level", logLevelHandler.GetLogLevel)
@@ -245,10 +291,10 @@ func registerRoutes(router *gin.Engine) {
 			protected.GET("/security/rate-limit-config", securityHandler.GetRateLimitConfig)
 
 			// Metrics handlers
-			metricsHandler := handler.NewMetricsHandler()
+			metricsHandler := handler.NewMetricsHandler(metricsCollector)
 			protected.GET("/metrics", metricsHandler.GetMetrics)
-			protected.GET("/health", metricsHandler.GetHealth)
-			protected.GET("/health/detailed", metricsHandler.GetHealthDetailed)
+			protected.GET("/health", metricsHandler.GetHealthStatus)
+			protected.GET("/health/detailed", metricsHandler.GetSystemMetrics)
 
 			// Config handlers
 			configHandler := handler.NewConfigHandler()

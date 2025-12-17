@@ -12,12 +12,14 @@ import (
 // SecurityHandler handles security-related HTTP requests
 type SecurityHandler struct {
 	csrfMiddleware *middleware.CSRFMiddleware
+	rateLimitConfig middleware.RateLimitConfig
 }
 
 // NewSecurityHandler creates a new security handler
 func NewSecurityHandler() *SecurityHandler {
 	return &SecurityHandler{
 		csrfMiddleware: middleware.NewCSRFMiddleware(),
+		rateLimitConfig: middleware.DefaultRateLimitConfig(),
 	}
 }
 
@@ -46,10 +48,9 @@ func (h *SecurityHandler) GetCSRFToken(c *gin.Context) {
 
 // GetRateLimitConfig handles requests to get rate limit configuration
 func (h *SecurityHandler) GetRateLimitConfig(c *gin.Context) {
-	// For now, we'll return a static configuration
-	// In a real application, this would come from configuration
 	response.Success(c, "Rate limit configuration retrieved successfully", gin.H{
-		"requests_per_minute": 60,
-		"burst":               10,
+		"requests_per_window": h.rateLimitConfig.Requests,
+		"window_seconds":      h.rateLimitConfig.Window.Seconds(),
+		"use_distributed_cache": h.rateLimitConfig.UseDistributedCache,
 	})
 }
