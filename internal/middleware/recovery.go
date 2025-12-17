@@ -23,12 +23,14 @@ func (m *RecoveryMiddleware) Handle() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if err := recover(); err != nil {
-				// Log the panic
+				// Log the panic with standardized format
 				logger.Error("Panic recovered",
 					zap.Any("error", err),
 					zap.String("stack", string(debug.Stack())),
 					zap.String("method", c.Request.Method),
 					zap.String("path", c.Request.URL.Path),
+					zap.String("client_ip", c.ClientIP()),
+					zap.String("user_agent", c.Request.UserAgent()),
 				)
 
 				// Return error response

@@ -109,8 +109,9 @@ func (s *TaskService) executeTask(task *model.Task) {
 func (s *TaskService) executeSampleTask(task *model.Task) {
 	fmt.Printf("Executing sample task: %s (ID: %d)\n", task.Name, task.ID)
 
-	// Simulate some work
-	time.Sleep(1 * time.Second)
+	// 移除调试用的sleep，提高性能
+	// 实际任务应该在这里执行具体的工作
+	// time.Sleep(1 * time.Second) // 已移除
 
 	fmt.Printf("Sample task completed: %s (ID: %d)\n", task.Name, task.ID)
 }

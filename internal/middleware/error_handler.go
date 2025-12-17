@@ -1,10 +1,11 @@
 package middleware
 
 import (
+	"errors"
 	"net/http"
 
 	"go-admin/internal/logger"
-	"go-admin/pkg/errors"
+	apperrors "go-admin/pkg/errors"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -29,15 +30,17 @@ func (m *ErrorHandlerMiddleware) Handle() gin.HandlerFunc {
 			// Get the last error
 			lastErr := c.Errors.Last()
 
-			// Log the error
+			// Log the error with improved error handling
 			logger.Error("Request error",
-				zap.String("error", lastErr.Error()),
+				zap.Error(lastErr), // 使用zap.Error()而不是zap.String()
 				zap.String("method", c.Request.Method),
 				zap.String("path", c.Request.URL.Path),
+				zap.String("client_ip", c.ClientIP()),
 			)
 
-			// Check if it's our custom error type
-			if appErr, ok := lastErr.Err.(*errors.Error); ok {
+			// Check if it's our custom error type - 使用errors.As()进行类型断言
+			var appErr *apperrors.Error
+			if errors.As(lastErr, &appErr) {
 				c.JSON(appErr.Code, gin.H{
 					"error":   appErr.Message,
 					"details": appErr.Details,

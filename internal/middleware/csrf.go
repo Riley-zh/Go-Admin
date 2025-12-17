@@ -73,8 +73,9 @@ func (m *CSRFMiddleware) Protect() gin.HandlerFunc {
 		expectedToken, err := c.Cookie("csrf_token")
 		if err != nil {
 			logger.Warn("CSRF token missing from cookie", 
-				zap.String("ip", c.ClientIP()), 
-				zap.String("path", c.Request.URL.Path))
+				zap.String("client_ip", c.ClientIP()), 
+				zap.String("path", c.Request.URL.Path),
+				zap.String("method", c.Request.Method))
 			c.JSON(http.StatusForbidden, gin.H{"error": "CSRF token missing"})
 			c.Abort()
 			return
@@ -83,8 +84,9 @@ func (m *CSRFMiddleware) Protect() gin.HandlerFunc {
 		// Validate token
 		if !m.ValidateToken(token, expectedToken) {
 			logger.Warn("Invalid CSRF token", 
-				zap.String("ip", c.ClientIP()), 
-				zap.String("path", c.Request.URL.Path))
+				zap.String("client_ip", c.ClientIP()), 
+				zap.String("path", c.Request.URL.Path),
+				zap.String("method", c.Request.Method))
 			c.JSON(http.StatusForbidden, gin.H{"error": "Invalid CSRF token"})
 			c.Abort()
 			return

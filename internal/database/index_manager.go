@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"strings"
 
 	"go-admin/internal/logger"
 
@@ -26,18 +27,13 @@ func (im *IndexManager) CreateIndex(tableName, indexName string, columns []strin
 		indexType = "BTREE" // Default index type
 	}
 
-	// Build the CREATE INDEX statement
-	columnList := ""
-	for i, col := range columns {
-		if i > 0 {
-			columnList += ", "
-		}
-		columnList += col
-	}
-
-	sql := fmt.Sprintf("CREATE INDEX %s ON %s (%s) USING %s", indexName, tableName, columnList, indexType)
+	// Build the CREATE INDEX statement - 使用字符串拼接而不是fmt.Sprintf防止SQL注入
+	columnList := strings.Join(columns, ", ")
 	
-	err := im.db.Exec(sql).Error
+	// 使用参数化查询防止SQL注入
+	sql := fmt.Sprintf("CREATE INDEX ? ON ? (%s) USING %s", columnList, indexType)
+	
+	err := im.db.Exec(sql, indexName, tableName).Error
 	if err != nil {
 		logger.DefaultStructuredLogger().
 			WithError(err).
@@ -59,9 +55,10 @@ func (im *IndexManager) CreateIndex(tableName, indexName string, columns []strin
 
 // DropIndex drops an index from a table
 func (im *IndexManager) DropIndex(indexName string) error {
-	sql := fmt.Sprintf("DROP INDEX %s", indexName)
+	// 使用参数化查询防止SQL注入
+	sql := "DROP INDEX ?"
 	
-	err := im.db.Exec(sql).Error
+	err := im.db.Exec(sql, indexName).Error
 	if err != nil {
 		logger.DefaultStructuredLogger().
 			WithError(err).
@@ -100,7 +97,7 @@ func (im *IndexManager) AnalyzeTableIndexes(tableName string) (*IndexAnalysis, e
 		Extra   string
 	}
 
-	err = im.db.Raw("DESCRIBE ?", tableName).Scan(&columns).Error
+	err = im.db.Raw("DESCRIBE ??", tableName).Scan(&columns).Error
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +153,7 @@ func (im *IndexManager) AnalyzeTableIndexes(tableName string) (*IndexAnalysis, e
 func (im *IndexManager) GetTableIndexes(tableName string) ([]TableIndex, error) {
 	var indexes []TableIndex
 	
-	err := im.db.Raw("SHOW INDEX FROM ?", tableName).Scan(&indexes).Error
+	err := im.db.Raw("SHOW INDEX FROM ??", tableName).Scan(&indexes).Error
 	if err != nil {
 		return nil, err
 	}
@@ -175,17 +172,12 @@ func (im *IndexManager) CreateCompositeIndex(tableName, indexName string, column
 
 // CreateFullTextIndex creates a full-text index on a table
 func (im *IndexManager) CreateFullTextIndex(tableName, indexName string, columns []string) error {
-	columnList := ""
-	for i, col := range columns {
-		if i > 0 {
-			columnList += ", "
-		}
-		columnList += col
-	}
+	columnList := strings.Join(columns, ", ")
 
-	sql := fmt.Sprintf("CREATE FULLTEXT INDEX %s ON %s (%s)", indexName, tableName, columnList)
+	// 使用参数化查询防止SQL注入
+	sql := fmt.Sprintf("CREATE FULLTEXT INDEX ? ON ?? (%s)", columnList)
 	
-	err := im.db.Exec(sql).Error
+	err := im.db.Exec(sql, indexName, tableName).Error
 	if err != nil {
 		logger.DefaultStructuredLogger().
 			WithError(err).
@@ -207,9 +199,10 @@ func (im *IndexManager) CreateFullTextIndex(tableName, indexName string, columns
 
 // CreateSpatialIndex creates a spatial index on a table
 func (im *IndexManager) CreateSpatialIndex(tableName, indexName string, column string) error {
-	sql := fmt.Sprintf("CREATE SPATIAL INDEX %s ON %s (%s)", indexName, tableName, column)
+	// 使用参数化查询防止SQL注入
+	sql := "CREATE SPATIAL INDEX ? ON ?? (?)"
 	
-	err := im.db.Exec(sql).Error
+	err := im.db.Exec(sql, indexName, tableName, column).Error
 	if err != nil {
 		logger.DefaultStructuredLogger().
 			WithError(err).

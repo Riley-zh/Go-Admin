@@ -13,61 +13,7 @@ import (
 
 // TransactionMiddleware 自动管理HTTP请求中的数据库事务
 func TransactionMiddleware(transactionManager *database.TransactionManager) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// 只对需要事务的请求进行处理
-		if !shouldUseTransaction(c) {
-			c.Next()
-			return
-		}
-
-		// 在事务中处理请求
-		result, err := transactionManager.WithTransaction(c.Request.Context(), func(tx *gorm.DB) error {
-			// 将事务存储到上下文中，以便处理器使用
-			c.Set("db", tx)
-
-			// 处理请求
-			c.Next()
-
-			// 如果响应已经写入且状态码表示错误，则返回错误以触发回滚
-			if c.Writer.Written() && c.Writer.Status() >= 400 {
-				return &TransactionError{
-					StatusCode: c.Writer.Status(),
-					Message:    "Request failed with status code " + string(rune(c.Writer.Status())),
-				}
-			}
-
-			return nil
-		})
-
-		// 记录事务结果
-		if err != nil {
-			logger.DefaultStructuredLogger().
-				WithError(err).
-				WithField("path", c.Request.URL.Path).
-				WithField("method", c.Request.Method).
-				WithField("success", result.Success).
-				WithField("retries", result.Retries).
-				WithField("duration_ms", result.Duration.Milliseconds()).
-				Error("Transaction failed")
-
-			// 如果响应尚未写入，则写入错误响应
-			if !c.Writer.Written() {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"code":    http.StatusInternalServerError,
-					"message": "Internal server error",
-					"data":    nil,
-				})
-			}
-		} else {
-			logger.DefaultStructuredLogger().
-				WithField("path", c.Request.URL.Path).
-				WithField("method", c.Request.Method).
-				WithField("success", result.Success).
-				WithField("retries", result.Retries).
-				WithField("duration_ms", result.Duration.Milliseconds()).
-				Info("Transaction completed successfully")
-		}
-	}
+	return TransactionMiddlewareWithConfig(transactionManager, DefaultTransactionConfig())
 }
 
 // TransactionMiddlewareWithConfig 带配置的事务中间件
