@@ -15,10 +15,14 @@ import (
 	"go-admin/internal/database"
 	"go-admin/internal/handler"
 	"go-admin/internal/logger"
-	"go-admin/internal/middleware"
 	"go-admin/internal/metrics"
+	"go-admin/internal/middleware"
+
+	_ "go-admin/docs" // This line is important for go-swagger to find your docs!
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 var (
@@ -120,6 +124,9 @@ func Run() error {
 }
 
 func registerRoutes(router *gin.Engine, metricsCollector *metrics.MetricsCollector) {
+	// Swagger documentation
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	// Health check endpoint
 	metricsHandler := handler.NewMetricsHandler(metricsCollector)
 	router.GET("/health", metricsHandler.GetHealthStatus)

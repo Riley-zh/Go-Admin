@@ -39,6 +39,7 @@
 - **日志**: Zap
 - **配置**: Viper
 - **认证**: JWT
+- **API文档**: Swagger/OpenAPI
 - **其他**: 限流、CSRF防护等中间件
 
 ## 项目结构
@@ -46,6 +47,7 @@
 ```
 go-admin/
 ├── config/                 # 配置管理
+├── docs/                   # Swagger自动生成的API文档
 ├── internal/
 │   ├── app/               # 应用启动和路由配置
 │   ├── cache/             # 自研缓存实现
@@ -119,7 +121,48 @@ go build -o go-admin main.go
 
 ## API文档
 
-详细的API接口文档请参考 [API.md](API.md) 文件。
+本项目集成了Swagger/OpenAPI自动生成API文档功能，提供了两种方式查看API文档：
+
+### 1. 在线Swagger UI (推荐)
+启动应用后，访问以下地址查看交互式API文档：
+```
+http://localhost:8080/swagger/index.html
+```
+
+Swagger UI提供了以下功能：
+- 交互式API文档浏览
+- 在线API测试
+- 请求/响应示例
+- 认证配置（JWT Token）
+
+### 2. 静态API文档
+详细的API接口文档也可以参考 [API.md](API.md) 文件。
+
+### 3. 更新API文档
+当添加新的API接口时，只需在handler函数中添加Swagger注释，然后运行以下命令更新文档：
+```bash
+go run github.com/swaggo/swag/cmd/swag@latest init
+```
+
+Swagger注释示例：
+```go
+// CreateUser godoc
+// @Summary Create a new user
+// @Description Create a new user with username, password and email
+// @Tags users
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body CreateUserRequest true "User details"
+// @Success 201 {object} map[string]interface{} "User created successfully"
+// @Failure 400 {object} map[string]interface{} "Bad Request"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 500 {object} map[string]interface{} "Internal Server Error"
+// @Router /users [post]
+func (h *UserHandler) CreateUser(c *gin.Context) {
+    // 实现代码
+}
+```
 
 ## 部署说明
 
