@@ -18,6 +18,9 @@ type RoleRepository interface {
 	Delete(id uint) error
 	List(page, pageSize int) ([]*model.Role, int64, error)
 	GetRolesByUserID(userID uint) ([]*model.Role, error)
+	GetUserRoles(userID uint) ([]*model.Role, error)
+	GetRoleHierarchy(roleID uint) ([]*model.Role, error)
+	GetRoleChildren(roleID uint) ([]*model.Role, error)
 }
 
 // roleRepository implements RoleRepository interface
@@ -103,4 +106,37 @@ func (r *roleRepository) GetRolesByUserID(userID uint) ([]*model.Role, error) {
 		return nil, err
 	}
 	return roles, nil
+}
+
+// GetUserRoles gets roles by user ID (alias for GetRolesByUserID)
+func (r *roleRepository) GetUserRoles(userID uint) ([]*model.Role, error) {
+	return r.GetRolesByUserID(userID)
+}
+
+// GetRoleHierarchy gets all ancestor roles for a given role ID
+func (r *roleRepository) GetRoleHierarchy(roleID uint) ([]*model.Role, error) {
+	var roles []*model.Role
+	// This is a simplified implementation
+	// In a real application, you would traverse the role hierarchy tree
+	query := `
+		SELECT r.* FROM roles r
+		JOIN role_hierarchy rh ON r.id = rh.parent_id
+		WHERE rh.child_id = ? AND r.status = ?
+	`
+	err := r.db.Raw(query, roleID, 1).Scan(&roles).Error
+	return roles, err
+}
+
+// GetRoleChildren gets all direct child roles for a given role ID
+func (r *roleRepository) GetRoleChildren(roleID uint) ([]*model.Role, error) {
+	var roles []*model.Role
+	// This is a simplified implementation
+	// In a real application, you would get direct children from the role hierarchy
+	query := `
+		SELECT r.* FROM roles r
+		JOIN role_hierarchy rh ON r.id = rh.child_id
+		WHERE rh.parent_id = ? AND r.status = ?
+	`
+	err := r.db.Raw(query, roleID, 1).Scan(&roles).Error
+	return roles, err
 }
