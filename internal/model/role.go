@@ -18,6 +18,16 @@ type Role struct {
 	Status      int    `gorm:"default:1" json:"status"` // 1: active, 0: inactive
 }
 
+// GetID returns the ID of the role
+func (r *Role) GetID() uint {
+	return r.ID
+}
+
+// GetStatus returns the status of the role
+func (r *Role) GetStatus() int {
+	return r.Status
+}
+
 // TableName specifies the table name
 func (Role) TableName() string {
 	return "roles"

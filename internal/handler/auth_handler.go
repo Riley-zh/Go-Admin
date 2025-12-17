@@ -1,21 +1,22 @@
 package handler
 
 import (
-	"net/http"
-
 	"go-admin/internal/service"
+	"go-admin/pkg/errors"
 
 	"github.com/gin-gonic/gin"
 )
 
 // AuthHandler represents the auth handler
 type AuthHandler struct {
+	*BaseHandler
 	authService service.AuthService
 }
 
 // NewAuthHandler creates a new auth handler
 func NewAuthHandler() *AuthHandler {
 	return &AuthHandler{
+		BaseHandler: NewBaseHandler(),
 		authService: service.NewAuthService(),
 	}
 }
@@ -38,53 +39,36 @@ type LoginRequest struct {
 func (h *AuthHandler) Register(c *gin.Context) {
 	// Validate request
 	var req RegisterRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid request format",
-			"details": err.Error(),
-		})
+	if !h.BindAndValidate(c, &req) {
 		return
 	}
 
 	// Register user
 	user, err := h.authService.Register(req.Username, req.Password, req.Email, req.Nickname)
 	if err != nil {
-		c.JSON(http.StatusConflict, gin.H{
-			"error":   "Registration failed",
-			"details": err.Error(),
-		})
+		h.HandleError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "User registered successfully",
-		"user":    user,
-	})
+	h.HandleCreated(c, "User registered successfully", gin.H{"user": user})
 }
 
 // Login handles user login
 func (h *AuthHandler) Login(c *gin.Context) {
 	// Validate request
 	var req LoginRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid request format",
-			"details": err.Error(),
-		})
+	if !h.BindAndValidate(c, &req) {
 		return
 	}
 
 	// Authenticate user
 	token, user, err := h.authService.Login(req.Username, req.Password)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error":   "Authentication failed",
-			"details": err.Error(),
-		})
+		h.HandleError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	h.HandleSuccess(c, gin.H{
 		"message": "Login successful",
 		"token":   token,
 		"user":    user,
@@ -96,9 +80,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	// Get token from Authorization header
 	authHeader := c.GetHeader("Authorization")
 	if authHeader == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": "Authorization header is required",
-		})
+		h.HandleError(c, errors.Unauthorized("Authorization header is required", ""))
 		return
 	}
 
@@ -108,16 +90,11 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	// Logout user
 	err := h.authService.Logout(tokenString)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Logout failed",
-			"details": err.Error(),
-		})
+		h.HandleError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Logout successful",
-	})
+	h.HandleSuccess(c, gin.H{"message": "Logout successful"})
 }
 
 // RefreshToken handles token refresh
@@ -125,9 +102,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	// Get token from Authorization header
 	authHeader := c.GetHeader("Authorization")
 	if authHeader == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": "Authorization header is required",
-		})
+		h.HandleError(c, errors.Unauthorized("Authorization header is required", ""))
 		return
 	}
 
@@ -137,14 +112,11 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	// Refresh token
 	newToken, err := h.authService.RefreshToken(tokenString)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error":   "Token refresh failed",
-			"details": err.Error(),
-		})
+		h.HandleError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	h.HandleSuccess(c, gin.H{
 		"message": "Token refreshed successfully",
 		"token":   newToken,
 	})

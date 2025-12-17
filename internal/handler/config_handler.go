@@ -1,20 +1,21 @@
 package handler
 
 import (
-	"net/http"
-
 	"go-admin/config"
-	"go-admin/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
 
 // ConfigHandler handles config-related HTTP requests
-type ConfigHandler struct{}
+type ConfigHandler struct {
+	*BaseHandler
+}
 
 // NewConfigHandler creates a new config handler
 func NewConfigHandler() *ConfigHandler {
-	return &ConfigHandler{}
+	return &ConfigHandler{
+		BaseHandler: NewBaseHandler(),
+	}
 }
 
 // GetConfig handles requests to get current configuration
@@ -22,7 +23,7 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 	cfg := config.Get()
 
 	// Return configuration (excluding sensitive information)
-	response.Success(c, "Configuration retrieved successfully", gin.H{
+	h.HandleSuccess(c, gin.H{
 		"app": gin.H{
 			"name": cfg.App.Name,
 			"env":  cfg.App.Env,
@@ -52,11 +53,12 @@ func (h *ConfigHandler) ReloadConfig(c *gin.Context) {
 	// This endpoint is provided for manual triggering if needed
 	cfg, err := config.Load()
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "Failed to reload configuration: "+err.Error())
+		h.HandleError(c, err)
 		return
 	}
 
-	response.Success(c, "Configuration reloaded successfully", gin.H{
+	h.HandleSuccess(c, gin.H{
+		"message": "Configuration reloaded successfully",
 		"app": gin.H{
 			"name": cfg.App.Name,
 			"env":  cfg.App.Env,

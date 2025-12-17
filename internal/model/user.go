@@ -21,6 +21,16 @@ type User struct {
 	Status   int    `gorm:"default:1" json:"status"` // 1: active, 0: inactive
 }
 
+// GetID returns the ID of the user
+func (u *User) GetID() uint {
+	return u.ID
+}
+
+// GetStatus returns the status of the user
+func (u *User) GetStatus() int {
+	return u.Status
+}
+
 // UserWithRoles represents a user with their roles
 type UserWithRoles struct {
 	User

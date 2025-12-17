@@ -1,9 +1,6 @@
 package handler
 
 import (
-	"net/http"
-	"strconv"
-
 	"go-admin/internal/model"
 	"go-admin/internal/service"
 	"go-admin/pkg/errors"
@@ -13,12 +10,14 @@ import (
 
 // UserHandler represents the user handler
 type UserHandler struct {
+	*BaseHandler
 	userService service.UserService
 }
 
 // NewUserHandler creates a new user handler
 func NewUserHandler() *UserHandler {
 	return &UserHandler{
+		BaseHandler: NewBaseHandler(),
 		userService: service.NewUserService(),
 	}
 }
@@ -47,98 +46,57 @@ type ChangePasswordRequest struct {
 func (h *UserHandler) CreateUser(c *gin.Context) {
 	// Validate request
 	var req CreateUserRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid request format",
-			"details": err.Error(),
-		})
+	if !h.BindAndValidate(c, &req) {
 		return
 	}
 
 	// Create user
 	user, err := h.userService.CreateUser(req.Username, req.Password, req.Email, req.Nickname)
 	if err != nil {
-		if appErr, ok := err.(*errors.Error); ok {
-			c.JSON(appErr.Code, gin.H{
-				"error":   appErr.Message,
-				"details": appErr.Details,
-			})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to create user",
-			"details": err.Error(),
-		})
+		h.HandleError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "User created successfully",
-		"user":    user,
-	})
+	h.HandleCreated(c, "User created successfully", gin.H{"user": user})
 }
 
 // GetUserByID handles getting a user by ID
 func (h *UserHandler) GetUserByID(c *gin.Context) {
 	// Get user ID from path parameter
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 64)
+	id, err := h.ParseIDParam(c, "id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid user ID",
-			"details": "用户ID格式不正确",
-		})
+		h.HandleValidationError(c, err)
 		return
 	}
 
 	// Get user
-	user, err := h.userService.GetUserByID(uint(id))
+	user, err := h.userService.GetUserByID(id)
 	if err != nil {
-		if appErr, ok := err.(*errors.Error); ok {
-			c.JSON(appErr.Code, gin.H{
-				"error":   appErr.Message,
-				"details": appErr.Details,
-			})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to get user",
-			"details": err.Error(),
-		})
+		h.HandleError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"user": user,
-	})
+	h.HandleSuccess(c, gin.H{"user": user})
 }
 
 // UpdateUser handles updating a user
 func (h *UserHandler) UpdateUser(c *gin.Context) {
 	// Get user ID from path parameter
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 64)
+	id, err := h.ParseIDParam(c, "id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid user ID",
-			"details": "用户ID格式不正确",
-		})
+		h.HandleValidationError(c, err)
 		return
 	}
 
 	// Validate request
 	var req UpdateUserRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid request format",
-			"details": err.Error(),
-		})
+	if !h.BindAndValidate(c, &req) {
 		return
 	}
 
 	// Create user model
 	user := &model.User{
-		ID:       uint(id),
+		ID:       id,
 		Email:    req.Email,
 		Nickname: req.Nickname,
 	}
@@ -146,101 +104,58 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	// Update user
 	err = h.userService.UpdateUser(user)
 	if err != nil {
-		if appErr, ok := err.(*errors.Error); ok {
-			c.JSON(appErr.Code, gin.H{
-				"error":   appErr.Message,
-				"details": appErr.Details,
-			})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to update user",
-			"details": err.Error(),
-		})
+		h.HandleError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "User updated successfully",
-	})
+	h.HandleSuccessWithMessage(c, "User updated successfully", nil)
 }
 
 // DeleteUser handles deleting a user
 func (h *UserHandler) DeleteUser(c *gin.Context) {
 	// Get user ID from path parameter
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 64)
+	id, err := h.ParseIDParam(c, "id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid user ID",
-			"details": "用户ID格式不正确",
-		})
+		h.HandleValidationError(c, err)
 		return
 	}
 
 	// Delete user
-	err = h.userService.DeleteUser(uint(id))
+	err = h.userService.DeleteUser(id)
 	if err != nil {
-		if appErr, ok := err.(*errors.Error); ok {
-			c.JSON(appErr.Code, gin.H{
-				"error":   appErr.Message,
-				"details": appErr.Details,
-			})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to delete user",
-			"details": err.Error(),
-		})
+		h.HandleError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "User deleted successfully",
-	})
+	h.HandleSuccessWithMessage(c, "User deleted successfully", nil)
 }
 
 // ListUsers handles listing users with pagination
 func (h *UserHandler) ListUsers(c *gin.Context) {
 	// Get pagination parameters
-	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
-	if err != nil || page < 1 {
-		page = 1
-	}
-
-	pageSize, err := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-	if err != nil || pageSize < 1 || pageSize > 100 {
-		pageSize = 10
-	}
+	params := h.GetPaginationParams(c)
 
 	// Check if roles should be included
 	includeRoles := c.DefaultQuery("include_roles", "false") == "true"
 
 	var users interface{}
 	var total int64
+	var err error
 
 	if includeRoles {
 		// List users with roles to prevent N+1 query problem
-		users, total, err = h.userService.ListUsersWithRoles(page, pageSize)
+		users, total, err = h.userService.ListUsersWithRoles(params.Page, params.PageSize)
 	} else {
 		// List users without roles (original behavior)
-		users, total, err = h.userService.ListUsers(page, pageSize)
+		users, total, err = h.userService.ListUsers(params.Page, params.PageSize)
 	}
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to list users",
-			"details": err.Error(),
-		})
+		h.HandleError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"users":     users,
-		"total":     total,
-		"page":      page,
-		"page_size": pageSize,
-	})
+	h.HandlePaginationResponse(c, gin.H{"users": users}, total, params)
 }
 
 // ChangePassword handles changing user password
@@ -248,48 +163,28 @@ func (h *UserHandler) ChangePassword(c *gin.Context) {
 	// Get user ID from context (set by JWT middleware)
 	userIDValue, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": "User not authenticated",
-		})
+		h.HandleError(c, errors.Unauthorized("User not authenticated", "用户未认证"))
 		return
 	}
 
 	userID, ok := userIDValue.(uint)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Invalid user ID",
-		})
+		h.HandleError(c, errors.InternalServerError("Invalid user ID", "无效的用户ID"))
 		return
 	}
 
 	// Validate request
 	var req ChangePasswordRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid request format",
-			"details": err.Error(),
-		})
+	if !h.BindAndValidate(c, &req) {
 		return
 	}
 
 	// Change password
 	err := h.userService.ChangePassword(userID, req.OldPassword, req.NewPassword)
 	if err != nil {
-		if appErr, ok := err.(*errors.Error); ok {
-			c.JSON(appErr.Code, gin.H{
-				"error":   appErr.Message,
-				"details": appErr.Details,
-			})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to change password",
-			"details": err.Error(),
-		})
+		h.HandleError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Password changed successfully",
-	})
+	h.HandleSuccessWithMessage(c, "Password changed successfully", nil)
 }

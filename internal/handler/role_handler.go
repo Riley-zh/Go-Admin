@@ -1,24 +1,23 @@
 package handler
 
 import (
-	"net/http"
-	"strconv"
-
 	"go-admin/internal/model"
 	"go-admin/internal/service"
-	"go-admin/pkg/errors"
+	"go-admin/pkg/common"
 
 	"github.com/gin-gonic/gin"
 )
 
 // RoleHandler represents the role handler
 type RoleHandler struct {
+	*BaseHandler
 	roleService service.RoleService
 }
 
 // NewRoleHandler creates a new role handler
 func NewRoleHandler() *RoleHandler {
 	return &RoleHandler{
+		BaseHandler: NewBaseHandler(),
 		roleService: service.NewRoleService(),
 	}
 }
@@ -45,98 +44,57 @@ type AssignRoleRequest struct {
 func (h *RoleHandler) CreateRole(c *gin.Context) {
 	// Validate request
 	var req CreateRoleRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid request format",
-			"details": err.Error(),
-		})
+	if !h.BindAndValidate(c, &req) {
 		return
 	}
 
 	// Create role
 	role, err := h.roleService.CreateRole(req.Name, req.Description)
 	if err != nil {
-		if appErr, ok := err.(*errors.Error); ok {
-			c.JSON(appErr.Code, gin.H{
-				"error":   appErr.Message,
-				"details": appErr.Details,
-			})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to create role",
-			"details": err.Error(),
-		})
+		h.HandleError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "Role created successfully",
-		"role":    role,
-	})
+	h.HandleCreated(c, "Role created successfully", gin.H{"role": role})
 }
 
 // GetRoleByID handles getting a role by ID
 func (h *RoleHandler) GetRoleByID(c *gin.Context) {
 	// Get role ID from path parameter
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 64)
+	id, err := h.ParseIDParam(c, "id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid role ID",
-			"details": "角色ID格式不正确",
-		})
+		h.HandleValidationError(c, err)
 		return
 	}
 
 	// Get role
-	role, err := h.roleService.GetRoleByID(uint(id))
+	role, err := h.roleService.GetRoleByID(id)
 	if err != nil {
-		if appErr, ok := err.(*errors.Error); ok {
-			c.JSON(appErr.Code, gin.H{
-				"error":   appErr.Message,
-				"details": appErr.Details,
-			})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to get role",
-			"details": err.Error(),
-		})
+		h.HandleError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"role": role,
-	})
+	h.HandleSuccess(c, gin.H{"role": role})
 }
 
 // UpdateRole handles updating a role
 func (h *RoleHandler) UpdateRole(c *gin.Context) {
 	// Get role ID from path parameter
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 64)
+	id, err := h.ParseIDParam(c, "id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid role ID",
-			"details": "角色ID格式不正确",
-		})
+		h.HandleValidationError(c, err)
 		return
 	}
 
 	// Validate request
 	var req UpdateRoleRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid request format",
-			"details": err.Error(),
-		})
+	if !h.BindAndValidate(c, &req) {
 		return
 	}
 
 	// Create role model
 	role := &model.Role{
-		ID:          uint(id),
+		ID:          id,
 		Name:        req.Name,
 		Description: req.Description,
 	}
@@ -144,88 +102,52 @@ func (h *RoleHandler) UpdateRole(c *gin.Context) {
 	// Update role
 	err = h.roleService.UpdateRole(role)
 	if err != nil {
-		if appErr, ok := err.(*errors.Error); ok {
-			c.JSON(appErr.Code, gin.H{
-				"error":   appErr.Message,
-				"details": appErr.Details,
-			})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to update role",
-			"details": err.Error(),
-		})
+		h.HandleError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Role updated successfully",
-	})
+	h.HandleSuccessWithMessage(c, "Role updated successfully", nil)
 }
 
 // DeleteRole handles deleting a role
 func (h *RoleHandler) DeleteRole(c *gin.Context) {
 	// Get role ID from path parameter
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 64)
+	id, err := h.ParseIDParam(c, "id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid role ID",
-			"details": "角色ID格式不正确",
-		})
+		h.HandleValidationError(c, err)
 		return
 	}
 
 	// Delete role
-	err = h.roleService.DeleteRole(uint(id))
+	err = h.roleService.DeleteRole(id)
 	if err != nil {
-		if appErr, ok := err.(*errors.Error); ok {
-			c.JSON(appErr.Code, gin.H{
-				"error":   appErr.Message,
-				"details": appErr.Details,
-			})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to delete role",
-			"details": err.Error(),
-		})
+		h.HandleError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Role deleted successfully",
-	})
+	h.HandleDeleted(c, "Role deleted successfully")
 }
 
 // ListRoles handles listing roles with pagination
 func (h *RoleHandler) ListRoles(c *gin.Context) {
 	// Get pagination parameters
-	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
-	if err != nil || page < 1 {
-		page = 1
-	}
-
-	pageSize, err := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-	if err != nil || pageSize < 1 || pageSize > 100 {
-		pageSize = 10
-	}
+	pagination := common.GetPaginationParams(c)
 
 	// List roles
-	roles, total, err := h.roleService.ListRoles(page, pageSize)
+	roles, total, err := h.roleService.ListRoles(pagination.Page, pagination.PageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to list roles",
-			"details": err.Error(),
-		})
+		h.HandleError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"roles":     roles,
-		"total":     total,
-		"page":      page,
-		"page_size": pageSize,
+	h.HandleSuccess(c, gin.H{
+		"roles": roles,
+		"pagination": gin.H{
+			"page":        pagination.Page,
+			"page_size":   pagination.PageSize,
+			"total":       total,
+			"total_pages": (total + int64(pagination.PageSize) - 1) / int64(pagination.PageSize),
+		},
 	})
 }
 
@@ -233,101 +155,53 @@ func (h *RoleHandler) ListRoles(c *gin.Context) {
 func (h *RoleHandler) AssignRole(c *gin.Context) {
 	// Validate request
 	var req AssignRoleRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid request format",
-			"details": err.Error(),
-		})
+	if !h.BindAndValidate(c, &req) {
 		return
 	}
 
 	// Assign role to user
 	err := h.roleService.AssignRoleToUser(req.UserID, req.RoleID)
 	if err != nil {
-		if appErr, ok := err.(*errors.Error); ok {
-			c.JSON(appErr.Code, gin.H{
-				"error":   appErr.Message,
-				"details": appErr.Details,
-			})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to assign role",
-			"details": err.Error(),
-		})
+		h.HandleError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Role assigned successfully",
-	})
+	h.HandleSuccess(c, gin.H{"message": "Role assigned successfully"})
 }
 
 // RemoveRole handles removing a role from a user
 func (h *RoleHandler) RemoveRole(c *gin.Context) {
 	// Validate request
 	var req AssignRoleRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid request format",
-			"details": err.Error(),
-		})
+	if !h.BindAndValidate(c, &req) {
 		return
 	}
 
 	// Remove role from user
 	err := h.roleService.RemoveRoleFromUser(req.UserID, req.RoleID)
 	if err != nil {
-		if appErr, ok := err.(*errors.Error); ok {
-			c.JSON(appErr.Code, gin.H{
-				"error":   appErr.Message,
-				"details": appErr.Details,
-			})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to remove role",
-			"details": err.Error(),
-		})
+		h.HandleError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Role removed successfully",
-	})
+	h.HandleSuccess(c, gin.H{"message": "Role removed successfully"})
 }
 
 // GetRolesByUserID handles getting roles by user ID
 func (h *RoleHandler) GetRolesByUserID(c *gin.Context) {
 	// Get user ID from path parameter
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 64)
+	userID, err := h.ParseIDParam(c, "id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid user ID",
-			"details": "用户ID格式不正确",
-		})
+		h.HandleValidationError(c, err)
 		return
 	}
 
-	// Get roles by user ID
-	roles, err := h.roleService.GetRolesByUserID(uint(id))
+	// Get roles
+	roles, err := h.roleService.GetRolesByUserID(userID)
 	if err != nil {
-		if appErr, ok := err.(*errors.Error); ok {
-			c.JSON(appErr.Code, gin.H{
-				"error":   appErr.Message,
-				"details": appErr.Details,
-			})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to get roles",
-			"details": err.Error(),
-		})
+		h.HandleError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"roles": roles,
-	})
+	h.HandleSuccess(c, gin.H{"roles": roles})
 }
