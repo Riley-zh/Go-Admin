@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go-admin/internal/database"
@@ -43,6 +44,9 @@ func QueryPerformanceMiddleware() gin.HandlerFunc {
 		// Register the callback
 		db.Callback().Query().Before("gorm:query").Register("track_query_before", beforeCallback)
 		db.Callback().Query().After("gorm:query").Register("track_query_after", afterCallback)
+		
+		// 禁用 GORM 的日志记录器，避免警告信息
+		db.Logger = db.Logger.LogMode(0)
 
 		// Process request
 		c.Next()
@@ -55,6 +59,9 @@ func QueryPerformanceMiddleware() gin.HandlerFunc {
 		// Unregister callbacks to avoid memory leaks
 		db.Callback().Query().Remove("track_query_before")
 		db.Callback().Query().Remove("track_query_after")
+		
+		// Disable GORM's internal logger to avoid duplicate warnings
+		db.Logger = db.Logger.LogMode(0)
 	}
 }
 
@@ -117,23 +124,12 @@ func (qt *QueryTracker) LogPerformance(c *gin.Context) {
 	avgDuration := totalDuration / time.Duration(len(qt.queries))
 	slowQueries := qt.GetSlowQueries(100 * time.Millisecond) // Queries taking more than 100ms are considered slow
 
-	// Log performance metrics
-	logger.DefaultStructuredLogger().
-		WithField("path", c.Request.URL.Path).
-		WithField("method", c.Request.Method).
-		WithField("query_count", len(qt.queries)).
-		WithField("total_duration_ms", totalDuration.Milliseconds()).
-		WithField("avg_duration_ms", avgDuration.Milliseconds()).
-		WithField("slow_query_count", len(slowQueries)).
-		Info("Database query performance")
+	// Log performance metrics in standard format
+	logger.Info(fmt.Sprintf("DB Queries: %d queries, total: %v, avg: %v", 
+		len(qt.queries), totalDuration, avgDuration))
 
 	// Log slow queries
 	for _, query := range slowQueries {
-		logger.DefaultStructuredLogger().
-			WithField("path", c.Request.URL.Path).
-			WithField("method", c.Request.Method).
-			WithField("sql", query.SQL).
-			WithField("duration_ms", query.Duration.Milliseconds()).
-			Warn("Slow database query detected")
+		logger.Warn(fmt.Sprintf("Slow query: %v", query.Duration))
 	}
 }

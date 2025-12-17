@@ -50,7 +50,9 @@ func Init(cfg config.DBConfig) (*gorm.DB, error) {
 	var err error
 
 	// Connect to database
-	db, err = gorm.Open(mysql.Open(cfg.DSN()), &gorm.Config{})
+	db, err = gorm.Open(mysql.Open(cfg.DSN()), &gorm.Config{
+		Logger: nil, // 禁用 GORM 的默认日志记录器
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}

@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"time"
 
@@ -115,15 +116,18 @@ func RequestLoggerMiddleware() gin.HandlerFunc {
 			log = log.WithField("error", c.Errors.String())
 		}
 
-		// Log based on status code
+		// Log based on status code with simple format
 		switch {
 		case statusCode >= 500:
-			log.Error("Server error")
+			logger.Error(fmt.Sprintf("Server error: %s %s - %d (%s)", method, path, statusCode, latency))
 		case statusCode >= 400:
-			log.Warn("Client error")
+			logger.Warn(fmt.Sprintf("Client error: %s %s - %d (%s)", method, path, statusCode, latency))
 		default:
-			log.Info("Request")
+			logger.Info(fmt.Sprintf("Request: %s %s - %d (%s)", method, path, statusCode, latency))
 		}
+		
+		// Don't log metrics separately to avoid duplicate logs
+		// The structured log above already contains all necessary information
 	}
 }
 

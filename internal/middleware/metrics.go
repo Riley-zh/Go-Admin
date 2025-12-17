@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"go-admin/internal/metrics"
-	"go-admin/internal/logger"
 
 	"github.com/gin-gonic/gin"
 )
@@ -61,29 +60,8 @@ func MetricsMiddleware(collector *metrics.MetricsCollector) gin.HandlerFunc {
 		// 记录指标
 		collector.RecordRequest(c.Request.Context(), requestMetrics)
 
-		// 记录慢请求
-		if duration > 2*time.Second {
-			logger.DefaultStructuredLogger().
-				WithField("path", c.Request.URL.Path).
-				WithField("method", c.Request.Method).
-				WithField("status_code", c.Writer.Status()).
-				WithField("duration_ms", duration.Milliseconds()).
-				WithField("client_ip", c.ClientIP()).
-				WithField("user_id", userID).
-				Warn("Slow request detected")
-		}
-
-		// 记录错误请求
-		if c.Writer.Status() >= 400 {
-			logger.DefaultStructuredLogger().
-				WithField("path", c.Request.URL.Path).
-				WithField("method", c.Request.Method).
-				WithField("status_code", c.Writer.Status()).
-				WithField("duration_ms", duration.Milliseconds()).
-				WithField("client_ip", c.ClientIP()).
-				WithField("user_id", userID).
-				Error("Error request")
-		}
+		// 不在这里记录日志，避免与 RequestLoggerMiddleware 重复
+		// 日志记录统一由 RequestLoggerMiddleware 处理
 	}
 }
 
@@ -160,30 +138,8 @@ func MetricsMiddlewareWithConfig(collector *metrics.MetricsCollector, config Met
 		// 记录指标
 		collector.RecordRequest(c.Request.Context(), requestMetrics)
 
-		// 记录慢请求
-		if duration > config.SlowRequestThreshold {
-			logger.DefaultStructuredLogger().
-				WithField("path", c.Request.URL.Path).
-				WithField("method", c.Request.Method).
-				WithField("status_code", c.Writer.Status()).
-				WithField("duration_ms", duration.Milliseconds()).
-				WithField("threshold_ms", config.SlowRequestThreshold.Milliseconds()).
-				WithField("client_ip", c.ClientIP()).
-				WithField("user_id", userID).
-				Warn("Slow request detected")
-		}
-
-		// 记录错误请求
-		if c.Writer.Status() >= 400 {
-			logger.DefaultStructuredLogger().
-				WithField("path", c.Request.URL.Path).
-				WithField("method", c.Request.Method).
-				WithField("status_code", c.Writer.Status()).
-				WithField("duration_ms", duration.Milliseconds()).
-				WithField("client_ip", c.ClientIP()).
-				WithField("user_id", userID).
-				Error("Error request")
-		}
+		// 不在这里记录日志，避免与 RequestLoggerMiddleware 重复
+		// 日志记录统一由 RequestLoggerMiddleware 处理
 
 		// 添加响应头
 		if config.AddResponseHeaders {

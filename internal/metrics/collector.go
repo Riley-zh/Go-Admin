@@ -4,8 +4,6 @@ import (
 	"context"
 	"sync"
 	"time"
-
-	"go-admin/internal/logger"
 )
 
 // MetricsCollector 收集和存储应用程序性能指标
@@ -90,17 +88,8 @@ func (mc *MetricsCollector) RecordRequest(ctx context.Context, metrics *RequestM
 	key := metrics.Path + ":" + metrics.Method
 	mc.requestMetrics[key] = metrics
 
-	// 记录到结构化日志
-	logger.DefaultStructuredLogger().
-		WithField("path", metrics.Path).
-		WithField("method", metrics.Method).
-		WithField("status_code", metrics.StatusCode).
-		WithField("duration_ms", metrics.Duration.Milliseconds()).
-		WithField("response_size", metrics.ResponseSize).
-		WithField("request_size", metrics.RequestSize).
-		WithField("client_ip", metrics.ClientIP).
-		WithField("user_id", metrics.UserID).
-		Info("Request metrics recorded")
+	// 不记录日志，避免与 RequestLoggerMiddleware 重复
+	// 指标收集只用于内部统计，不输出到日志
 }
 
 // GetMetricsSummary 获取指标摘要
@@ -214,7 +203,7 @@ func (mc *MetricsCollector) ClearMetrics() {
 	defer mc.mu.Unlock()
 
 	mc.requestMetrics = make(map[string]*RequestMetrics)
-	logger.DefaultStructuredLogger().Info("Metrics cleared")
+	// 不记录日志，避免不必要的输出
 }
 
 // GetMetricsByPath 获取特定路径的指标

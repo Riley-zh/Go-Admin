@@ -76,13 +76,11 @@ func Run() error {
 
 	// Add middlewares
 	router.Use(middleware.NewRecoveryMiddleware().Handle())
-	router.Use(logger.GinLogger())
+	router.Use(middleware.RequestLoggerMiddleware())
 	router.Use(middleware.NewErrorHandlerMiddleware().Handle())
 	router.Use(middleware.QueryPerformanceMiddleware())
 	router.Use(middleware.MetricsMiddleware(metricsCollector))
 	router.Use(rateLimiter.Limit())
-	router.Use(middleware.RequestLoggerMiddleware())
-	router.Use(middleware.ResponseCacheMiddleware(cacheConfig))
 	router.Use(middleware.TransactionMiddleware(transactionManager))
 
 	// Register routes

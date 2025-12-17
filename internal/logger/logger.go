@@ -27,7 +27,7 @@ func Init(cfg config.LogConfig) error {
 		return fmt.Errorf("failed to parse log level: %w", err)
 	}
 
-	// Configure encoder
+	// Configure encoder for standard human-readable output
 	encoderConfig := zapcore.EncoderConfig{
 		TimeKey:        "time",
 		LevelKey:       "level",
@@ -36,18 +36,15 @@ func Init(cfg config.LogConfig) error {
 		MessageKey:     "msg",
 		StacktraceKey:  "stacktrace",
 		LineEnding:     zapcore.DefaultLineEnding,
-		EncodeLevel:    zapcore.LowercaseLevelEncoder,
+		EncodeLevel:    zapcore.CapitalColorLevelEncoder, // 使用带颜色的大写级别
 		EncodeTime:     zapcore.ISO8601TimeEncoder,
-		EncodeDuration: zapcore.SecondsDurationEncoder,
+		EncodeDuration: zapcore.StringDurationEncoder,
 		EncodeCaller:   zapcore.ShortCallerEncoder,
+		ConsoleSeparator: " ", // 使用空格作为分隔符
 	}
 
-	var encoder zapcore.Encoder
-	if cfg.Output == "json" {
-		encoder = zapcore.NewJSONEncoder(encoderConfig)
-	} else {
-		encoder = zapcore.NewConsoleEncoder(encoderConfig)
-	}
+	// 使用控制台编码器，输出更易读的格式
+	encoder := zapcore.NewConsoleEncoder(encoderConfig)
 
 	// Configure writer
 	var writers []zapcore.WriteSyncer
