@@ -59,6 +59,20 @@ func (m *JWTMiddleware) Handle() gin.HandlerFunc {
 			return
 		}
 
+		// Additional JTI blacklist check (if JTI is available)
+		// This provides an extra layer of security by checking JWT ID
+		// Note: This is already done in GetUserByToken, but we're adding it here
+		// for defense in depth in case the service implementation changes
+		if claims, err := m.authService.ValidateToken(tokenString); err == nil {
+			if authClaims, ok := claims.Claims.(*service.AuthClaims); ok && authClaims.ID != "" {
+				if _, exists := cacheInstance.Get("blacklist:jti:" + authClaims.ID); exists {
+					c.JSON(http.StatusUnauthorized, gin.H{"error": "Token is invalid"})
+					c.Abort()
+					return
+				}
+			}
+		}
+
 		// Set user in context
 		c.Set("user", user)
 		c.Set("userID", user.ID)

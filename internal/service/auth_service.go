@@ -5,11 +5,13 @@ import (
 	"time"
 
 	"go-admin/internal/cache"
+	"go-admin/internal/logger"
 	"go-admin/internal/model"
 	"go-admin/internal/repository"
 	"go-admin/pkg/utils"
 
 	"github.com/golang-jwt/jwt/v5"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -32,6 +34,7 @@ type authService struct {
 type AuthClaims struct {
 	UserID   uint   `json:"user_id"`
 	Username string `json:"username"`
+	ID       string `json:"jti,omitempty"` // JWT ID for token identification and blacklisting
 	jwt.RegisteredClaims
 }
 
@@ -119,9 +122,52 @@ func (s *authService) Login(username, password string) (string, *model.User, err
 
 // Logout invalidates the JWT token
 func (s *authService) Logout(tokenString string) error {
-	// Add token to blacklist cache
+	// Validate token first to get expiration time
+	token, err := s.ValidateToken(tokenString)
+	if err != nil {
+		// Even if token is invalid, add it to blacklist as a safety measure
+		cacheInstance := cache.GetInstance()
+		if err := cacheInstance.Set("blacklist:"+tokenString, true, 24*time.Hour); err != nil {
+			logger.Error("Failed to add invalid token to blacklist", zap.Error(err), zap.String("token", tokenString[:min(len(tokenString), 10)]+"..."))
+		}
+		return nil
+	}
+
+	// Get token expiration time to set appropriate blacklist duration
+	claims, ok := token.Claims.(*AuthClaims)
+	if !ok || !token.Valid {
+		// Add to blacklist with default duration
+		cacheInstance := cache.GetInstance()
+		if err := cacheInstance.Set("blacklist:"+tokenString, true, 24*time.Hour); err != nil {
+			logger.Error("Failed to add invalid token to blacklist", zap.Error(err), zap.String("token", tokenString[:min(len(tokenString), 10)]+"..."))
+		}
+		return nil
+	}
+
+	// Calculate remaining time until token expires
+	var blacklistDuration time.Duration
+	if claims.ExpiresAt != nil {
+		blacklistDuration = claims.ExpiresAt.Time.Sub(time.Now())
+		// Add a buffer time to ensure token is definitely invalid
+		blacklistDuration += 5 * time.Minute
+	} else {
+		// Default to 24 hours if no expiration is set
+		blacklistDuration = 24 * time.Hour
+	}
+
+	// Add token to blacklist cache with calculated duration
 	cacheInstance := cache.GetInstance()
-	cacheInstance.Set("blacklist:"+tokenString, true, 24*time.Hour)
+	if err := cacheInstance.Set("blacklist:"+tokenString, true, blacklistDuration); err != nil {
+		logger.Error("Failed to add token to blacklist", zap.Error(err), zap.String("token", tokenString[:min(len(tokenString), 10)]+"..."))
+	}
+	
+	// Also add the JTI (JWT ID) if available to prevent token reuse
+	if claims.ID != "" {
+		if err := cacheInstance.Set("blacklist:jti:"+claims.ID, true, blacklistDuration); err != nil {
+			logger.Error("Failed to add JTI to blacklist", zap.Error(err), zap.String("jti", claims.ID))
+		}
+	}
+
 	return nil
 }
 
@@ -145,6 +191,13 @@ func (s *authService) RefreshToken(tokenString string) (string, error) {
 		return "", errors.New("invalid token")
 	}
 
+	// Check if JTI is in blacklist (additional security check)
+	if claims.ID != "" {
+		if _, exists := cacheInstance.Get("blacklist:jti:" + claims.ID); exists {
+			return "", errors.New("token is invalid")
+		}
+	}
+
 	// Get user
 	user, err := s.userRepo.GetByID(claims.UserID)
 	if err != nil {
@@ -158,6 +211,30 @@ func (s *authService) RefreshToken(tokenString string) (string, error) {
 	newToken, err := s.generateToken(user)
 	if err != nil {
 		return "", err
+	}
+
+	// Add old token to blacklist to prevent reuse
+	// Calculate remaining time until old token expires
+	var blacklistDuration time.Duration
+	if claims.ExpiresAt != nil {
+		blacklistDuration = claims.ExpiresAt.Time.Sub(time.Now())
+		// Add a buffer time to ensure token is definitely invalid
+		blacklistDuration += 5 * time.Minute
+	} else {
+		// Default to 24 hours if no expiration is set
+		blacklistDuration = 24 * time.Hour
+	}
+
+	// Add old token to blacklist cache with calculated duration
+	if err := cacheInstance.Set("blacklist:"+tokenString, true, blacklistDuration); err != nil {
+		logger.Error("Failed to add old token to blacklist", zap.Error(err), zap.String("token", tokenString[:min(len(tokenString), 10)]+"..."))
+	}
+	
+	// Also add the JTI (JWT ID) if available to prevent token reuse
+	if claims.ID != "" {
+		if err := cacheInstance.Set("blacklist:jti:"+claims.ID, true, blacklistDuration); err != nil {
+			logger.Error("Failed to add JTI to blacklist", zap.Error(err), zap.String("jti", claims.ID))
+		}
 	}
 
 	return newToken, nil
@@ -200,8 +277,13 @@ func (s *authService) GetUserByToken(tokenString string) (*model.User, error) {
 
 // ValidateToken validates JWT token
 func (s *authService) ValidateToken(tokenString string) (*jwt.Token, error) {
+	secret, err := utils.GetJWTSecret()
+	if err != nil {
+		return nil, err
+	}
+	
 	token, err := jwt.ParseWithClaims(tokenString, &AuthClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return utils.GetJWTSecret(), nil
+		return secret, nil
 	})
 
 	if err != nil {
@@ -213,17 +295,26 @@ func (s *authService) ValidateToken(tokenString string) (*jwt.Token, error) {
 
 // generateToken generates JWT token for a user
 func (s *authService) generateToken(user *model.User) (string, error) {
+	// Generate a unique JWT ID for token identification and blacklisting
+	jti := utils.GenerateUUID()
+	
 	claims := AuthClaims{
 		UserID:   user.ID,
 		Username: user.Username,
+		ID:       jti, // Add JWT ID for token tracking and blacklisting
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 			Issuer:    "go-admin",
+			ID:        jti, // Also set in RegisteredClaims
 		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(utils.GetJWTSecret())
+	secret, err := utils.GetJWTSecret()
+	if err != nil {
+		return "", err
+	}
+	return token.SignedString(secret)
 }

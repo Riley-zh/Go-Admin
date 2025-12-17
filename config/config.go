@@ -29,11 +29,15 @@ type AppConfig struct {
 
 // DBConfig holds database configuration
 type DBConfig struct {
-	Host     string
-	Port     string
-	User     string
-	Password string
-	Name     string
+	Host            string
+	Port            string
+	User            string
+	Password        string
+	Name            string
+	MaxIdleConns    int
+	MaxOpenConns    int
+	ConnMaxLifetime time.Duration
+	ConnMaxIdleTime time.Duration
 }
 
 // LogConfig holds logger configuration
@@ -50,8 +54,19 @@ type JWTConfig struct {
 
 // CacheConfig holds cache configuration
 type CacheConfig struct {
-	MaxSize    int
-	GCInterval time.Duration
+	Type       string        // "memory" or "redis"
+	MaxSize    int           // Only for memory cache
+	GCInterval time.Duration // Only for memory cache
+	Redis      RedisConfig   // Only for redis cache
+}
+
+// RedisConfig holds Redis configuration
+type RedisConfig struct {
+	Host     string
+	Port     string
+	Password string
+	DB       int
+	PoolSize int
 }
 
 var (
@@ -134,6 +149,11 @@ func setDefaults() {
 	viper.SetDefault("db.user", "root")
 	viper.SetDefault("db.password", "password")
 	viper.SetDefault("db.name", "go_admin")
+	// Optimized database connection pool settings
+	viper.SetDefault("db.max_idle_conns", 25)           // Increased from 10 to handle more concurrent requests
+	viper.SetDefault("db.max_open_conns", 100)          // Keep at 100 as it's a reasonable limit
+	viper.SetDefault("db.conn_max_lifetime", "1h")      // Keep at 1 hour to prevent connection staleness
+	viper.SetDefault("db.conn_max_idle_time", "10m")    // New setting to close idle connections after 10 minutes
 
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("log.output", "console")
@@ -141,8 +161,15 @@ func setDefaults() {
 	viper.SetDefault("jwt.secret", "go-admin-secret")
 	viper.SetDefault("jwt.expire", "24h")
 
+	viper.SetDefault("cache.type", "memory")               // "memory" or "redis"
 	viper.SetDefault("cache.maxsize", 10000)
 	viper.SetDefault("cache.gcinterval", "10m")
+	// Redis configuration
+	viper.SetDefault("cache.redis.host", "localhost")
+	viper.SetDefault("cache.redis.port", "6379")
+	viper.SetDefault("cache.redis.password", "")
+	viper.SetDefault("cache.redis.db", 0)
+	viper.SetDefault("cache.redis.poolsize", 10)
 }
 
 func bindEnvs() {
@@ -157,6 +184,11 @@ func bindEnvs() {
 	viper.BindEnv("db.user", "DB_USER")
 	viper.BindEnv("db.password", "DB_PASSWORD")
 	viper.BindEnv("db.name", "DB_NAME")
+	// Database connection pool settings
+	viper.BindEnv("db.max_idle_conns", "DB_MAX_IDLE_CONNS")
+	viper.BindEnv("db.max_open_conns", "DB_MAX_OPEN_CONNS")
+	viper.BindEnv("db.conn_max_lifetime", "DB_CONN_MAX_LIFETIME")
+	viper.BindEnv("db.conn_max_idle_time", "DB_CONN_MAX_IDLE_TIME")
 
 	// Log config
 	viper.BindEnv("log.level", "LOG_LEVEL")
@@ -167,8 +199,15 @@ func bindEnvs() {
 	viper.BindEnv("jwt.expire", "JWT_EXPIRE")
 
 	// Cache config
+	viper.BindEnv("cache.type", "CACHE_TYPE")
 	viper.BindEnv("cache.maxsize", "CACHE_MAXSIZE")
 	viper.BindEnv("cache.gcinterval", "CACHE_GCINTERVAL")
+	// Redis configuration
+	viper.BindEnv("cache.redis.host", "REDIS_HOST")
+	viper.BindEnv("cache.redis.port", "REDIS_PORT")
+	viper.BindEnv("cache.redis.password", "REDIS_PASSWORD")
+	viper.BindEnv("cache.redis.db", "REDIS_DB")
+	viper.BindEnv("cache.redis.poolsize", "REDIS_POOLSIZE")
 }
 
 func (c *Configuration) validate() error {

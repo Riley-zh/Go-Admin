@@ -3,7 +3,6 @@ package database
 import (
 	"database/sql"
 	"fmt"
-	"time"
 
 	"go-admin/config"
 
@@ -26,6 +25,26 @@ func Stats() sql.DBStats {
 	return sql.DBStats{}
 }
 
+// Health checks the database connection health
+func Health() error {
+	if db == nil {
+		return fmt.Errorf("database not initialized")
+	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		return fmt.Errorf("failed to get database object: %w", err)
+	}
+
+	// Ping the database to check connection
+	err = sqlDB.Ping()
+	if err != nil {
+		return fmt.Errorf("database connection failed: %w", err)
+	}
+
+	return nil
+}
+
 // Init initializes the database connection
 func Init(cfg config.DBConfig) (*gorm.DB, error) {
 	var err error
@@ -42,10 +61,11 @@ func Init(cfg config.DBConfig) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to get database object: %w", err)
 	}
 
-	// Set connection pool settings
-	sqlDB.SetMaxIdleConns(10)           // Maximum number of connections in the idle connection pool
-	sqlDB.SetMaxOpenConns(100)          // Maximum number of open connections to the database
-	sqlDB.SetConnMaxLifetime(time.Hour) // Maximum amount of time a connection may be reused
+	// Set connection pool settings with optimized values
+	sqlDB.SetMaxIdleConns(cfg.MaxIdleConns)           // Maximum number of connections in the idle connection pool
+	sqlDB.SetMaxOpenConns(cfg.MaxOpenConns)          // Maximum number of open connections to the database
+	sqlDB.SetConnMaxLifetime(cfg.ConnMaxLifetime)    // Maximum amount of time a connection may be reused
+	sqlDB.SetConnMaxIdleTime(cfg.ConnMaxIdleTime)    // Maximum amount of time a connection may be idle
 
 	return db, nil
 }

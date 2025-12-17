@@ -29,8 +29,15 @@ func (h *SecurityHandler) GetCSRFToken(c *gin.Context) {
 		return
 	}
 
-	// Set token in cookie
-	c.SetCookie("csrf_token", token, 3600, "/", "", false, true)
+	// Set token in cookie with enhanced security attributes
+	// Secure=true to only send over HTTPS (in production)
+	// HttpOnly=true to prevent XSS attacks from accessing the cookie
+	isSecure := c.Request.TLS != nil // Use Secure flag if HTTPS
+	c.SetCookie("csrf_token", token, 3600, "/", "", isSecure, true)
+
+	// Note: SameSite attribute is not directly supported in Gin's SetCookie method
+	// In a production environment, you might want to use a custom cookie setting method
+	// that supports SameSite=Strict for enhanced CSRF protection
 
 	response.Success(c, "CSRF token generated successfully", gin.H{
 		"token": token,

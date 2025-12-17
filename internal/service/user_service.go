@@ -14,6 +14,7 @@ type UserService interface {
 	UpdateUser(user *model.User) error
 	DeleteUser(id uint) error
 	ListUsers(page, pageSize int) ([]*model.User, int64, error)
+	ListUsersWithRoles(page, pageSize int) ([]*model.UserWithRoles, int64, error)
 	ChangePassword(userID uint, oldPassword, newPassword string) error
 }
 
@@ -150,6 +151,21 @@ func (s *userService) ListUsers(page, pageSize int) ([]*model.User, int64, error
 	}
 
 	return users, total, nil
+}
+
+// ListUsersWithRoles lists users with their roles using optimized queries to prevent N+1 problem
+func (s *userService) ListUsersWithRoles(page, pageSize int) ([]*model.UserWithRoles, int64, error) {
+	usersWithRoles, total, err := s.userRepo.ListWithRoles(page, pageSize)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Hide passwords
+	for _, user := range usersWithRoles {
+		user.Password = ""
+	}
+
+	return usersWithRoles, total, nil
 }
 
 // ChangePassword changes user password

@@ -20,29 +20,34 @@ type Cache struct {
 }
 
 var (
-	instance *Cache
+	instance CacheInterface
 	once     sync.Once
 )
 
-// Init initializes the cache with the given configuration
+// Init initializes cache with given configuration
 func Init(cfg config.CacheConfig) {
 	once.Do(func() {
-		instance = &Cache{
-			maxSize: cfg.MaxSize,
+		switch cfg.Type {
+		case "redis":
+			instance = NewRedisCache(cfg.Redis)
+		default:
+			memCache := &Cache{
+				maxSize: cfg.MaxSize,
+			}
+			// Start garbage collection goroutine for memory cache
+			go memCache.startGC(cfg.GCInterval)
+			instance = memCache
 		}
-
-		// Start garbage collection goroutine
-		go instance.startGC(cfg.GCInterval)
 	})
 }
 
-// GetInstance returns the singleton cache instance
-func GetInstance() *Cache {
+// GetInstance returns the cache instance
+func GetInstance() CacheInterface {
 	return instance
 }
 
 // Set stores a value in the cache with an expiration time
-func (c *Cache) Set(key string, value interface{}, expire time.Duration) {
+func (c *Cache) Set(key string, value interface{}, expire time.Duration) error {
 	c.data.Store(key, value)
 
 	if expire > 0 {
@@ -51,6 +56,7 @@ func (c *Cache) Set(key string, value interface{}, expire time.Duration) {
 	} else {
 		c.expireTimes.Delete(key)
 	}
+	return nil
 }
 
 // Get retrieves a value from the cache
@@ -75,13 +81,14 @@ func (c *Cache) Get(key string) (interface{}, bool) {
 }
 
 // Delete removes a value from the cache
-func (c *Cache) Delete(key string) {
+func (c *Cache) Delete(key string) error {
 	c.data.Delete(key)
 	c.expireTimes.Delete(key)
+	return nil
 }
 
 // Clear removes all values from the cache
-func (c *Cache) Clear() {
+func (c *Cache) Clear() error {
 	c.data.Range(func(key, _ interface{}) bool {
 		c.data.Delete(key)
 		return true
@@ -91,9 +98,9 @@ func (c *Cache) Clear() {
 		c.expireTimes.Delete(key)
 		return true
 	})
+	return nil
 }
 
-// Size returns the number of items in the cache
 func (c *Cache) Size() int {
 	size := 0
 	c.data.Range(func(_, _ interface{}) bool {
@@ -134,6 +141,12 @@ func (c *Cache) startGC(interval time.Duration) {
 	for range ticker.C {
 		c.GC()
 	}
+}
+
+// Close closes the cache and cleans up resources
+func (c *Cache) Close() error {
+	c.Clear()
+	return nil
 }
 
 // GC removes expired items from the cache

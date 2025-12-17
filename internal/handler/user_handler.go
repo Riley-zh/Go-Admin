@@ -213,8 +213,20 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 		pageSize = 10
 	}
 
-	// List users
-	users, total, err := h.userService.ListUsers(page, pageSize)
+	// Check if roles should be included
+	includeRoles := c.DefaultQuery("include_roles", "false") == "true"
+
+	var users interface{}
+	var total int64
+
+	if includeRoles {
+		// List users with roles to prevent N+1 query problem
+		users, total, err = h.userService.ListUsersWithRoles(page, pageSize)
+	} else {
+		// List users without roles (original behavior)
+		users, total, err = h.userService.ListUsers(page, pageSize)
+	}
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "Failed to list users",

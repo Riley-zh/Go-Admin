@@ -21,6 +21,12 @@ type User struct {
 	Status   int    `gorm:"default:1" json:"status"` // 1: active, 0: inactive
 }
 
+// UserWithRoles represents a user with their roles
+type UserWithRoles struct {
+	User
+	Roles []*Role `json:"roles,omitempty"`
+}
+
 // TableName specifies the table name
 func (User) TableName() string {
 	return "users"
