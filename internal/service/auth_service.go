@@ -147,7 +147,7 @@ func (s *authService) Logout(tokenString string) error {
 	// Calculate remaining time until token expires
 	var blacklistDuration time.Duration
 	if claims.ExpiresAt != nil {
-		blacklistDuration = claims.ExpiresAt.Time.Sub(time.Now())
+		blacklistDuration = time.Until(claims.ExpiresAt.Time)
 		// Add a buffer time to ensure token is definitely invalid
 		blacklistDuration += 5 * time.Minute
 	} else {
@@ -160,7 +160,7 @@ func (s *authService) Logout(tokenString string) error {
 	if err := cacheInstance.Set("blacklist:"+tokenString, true, blacklistDuration); err != nil {
 		logger.Error("Failed to add token to blacklist", zap.Error(err), zap.String("token", tokenString[:min(len(tokenString), 10)]+"..."))
 	}
-	
+
 	// Also add the JTI (JWT ID) if available to prevent token reuse
 	if claims.ID != "" {
 		if err := cacheInstance.Set("blacklist:jti:"+claims.ID, true, blacklistDuration); err != nil {
@@ -217,7 +217,7 @@ func (s *authService) RefreshToken(tokenString string) (string, error) {
 	// Calculate remaining time until old token expires
 	var blacklistDuration time.Duration
 	if claims.ExpiresAt != nil {
-		blacklistDuration = claims.ExpiresAt.Time.Sub(time.Now())
+		blacklistDuration = time.Until(claims.ExpiresAt.Time)
 		// Add a buffer time to ensure token is definitely invalid
 		blacklistDuration += 5 * time.Minute
 	} else {
@@ -229,7 +229,7 @@ func (s *authService) RefreshToken(tokenString string) (string, error) {
 	if err := cacheInstance.Set("blacklist:"+tokenString, true, blacklistDuration); err != nil {
 		logger.Error("Failed to add old token to blacklist", zap.Error(err), zap.String("token", tokenString[:min(len(tokenString), 10)]+"..."))
 	}
-	
+
 	// Also add the JTI (JWT ID) if available to prevent token reuse
 	if claims.ID != "" {
 		if err := cacheInstance.Set("blacklist:jti:"+claims.ID, true, blacklistDuration); err != nil {
@@ -281,7 +281,7 @@ func (s *authService) ValidateToken(tokenString string) (*jwt.Token, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	token, err := jwt.ParseWithClaims(tokenString, &AuthClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return secret, nil
 	})
@@ -297,7 +297,7 @@ func (s *authService) ValidateToken(tokenString string) (*jwt.Token, error) {
 func (s *authService) generateToken(user *model.User) (string, error) {
 	// Generate a unique JWT ID for token identification and blacklisting
 	jti := utils.GenerateUUID()
-	
+
 	claims := AuthClaims{
 		UserID:   user.ID,
 		Username: user.Username,

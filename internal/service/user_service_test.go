@@ -61,6 +61,14 @@ func (m *MockUserRepository) List(page, pageSize int) ([]*model.User, int64, err
 	return args.Get(0).([]*model.User), int64(args.Int(1)), args.Error(2)
 }
 
+func (m *MockUserRepository) ListWithRoles(page, pageSize int) ([]*model.UserWithRoles, int64, error) {
+	args := m.Called(page, pageSize)
+	if args.Get(0) == nil {
+		return nil, 0, args.Error(2)
+	}
+	return args.Get(0).([]*model.UserWithRoles), int64(args.Int(1)), args.Error(2)
+}
+
 func TestUserService_CreateUser(t *testing.T) {
 	// Create a mock user repository
 	mockRepo := new(MockUserRepository)

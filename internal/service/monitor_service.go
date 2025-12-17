@@ -2,7 +2,6 @@ package service
 
 import (
 	"runtime"
-	"sync"
 	"time"
 
 	"go-admin/internal/model"
@@ -11,7 +10,6 @@ import (
 // MonitorService handles system monitoring
 type MonitorService struct {
 	startTime time.Time
-	mu        sync.RWMutex
 }
 
 // NewMonitorService creates a new monitor service
