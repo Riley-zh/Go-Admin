@@ -10,6 +10,7 @@ import (
 	"go-admin/internal/model"
 	"go-admin/internal/repository"
 
+	"github.com/Knetic/govaluate"
 	"go.uber.org/zap"
 )
 
@@ -67,19 +68,19 @@ type PermissionService interface {
 
 // PermissionInfo represents permission information
 type PermissionInfo struct {
-	Resource   *model.Resource          `json:"resource"`
-	Action     *model.Action            `json:"action"`
+	Resource   *model.Resource            `json:"resource"`
+	Action     *model.Action              `json:"action"`
 	Conditions *model.PermissionCondition `json:"conditions,omitempty"`
-	Priority   int                      `json:"priority"`
+	Priority   int                        `json:"priority"`
 }
 
 // PermissionCheckContext represents the context for permission checking
 type PermissionCheckContext struct {
-	User       *model.User
-	Resource   *model.Resource
-	Action     *model.Action
-	UserAttrs  map[string]interface{}
-	ResAttrs   map[string]interface{}
+	User        *model.User
+	Resource    *model.Resource
+	Action      *model.Action
+	UserAttrs   map[string]interface{}
+	ResAttrs    map[string]interface{}
 	Environment map[string]interface{}
 }
 
@@ -413,17 +414,67 @@ func (s *permissionService) evaluateConditions(conditions *model.PermissionCondi
 	return true
 }
 
-// evaluateExpression evaluates a simple expression
+// evaluateExpression evaluates a simple expression using govaluate
 func (s *permissionService) evaluateExpression(expression string, userAttrs, resourceAttrs, env map[string]interface{}) bool {
 	// This is a simple implementation - in production, use a proper expression engine
 	// For now, just return true for simple expressions
 	if strings.TrimSpace(expression) == "" {
 		return true
 	}
-	
-	// TODO: Implement proper expression evaluation using a library like govaluate or similar
-	logger.Warn("Expression evaluation not fully implemented", zap.String("expression", expression))
-	return true
+
+	// Create parameters for the expression
+	parameters := make(map[string]interface{})
+
+	// Add user attributes with user. prefix
+	for key, value := range userAttrs {
+		parameters["user."+key] = value
+	}
+
+	// Add resource attributes with resource. prefix
+	for key, value := range resourceAttrs {
+		parameters["resource."+key] = value
+	}
+
+	// Add environment variables with env. prefix
+	for key, value := range env {
+		parameters["env."+key] = value
+	}
+
+	// Create the expression
+	expr, err := govaluate.NewEvaluableExpression(expression)
+	if err != nil {
+		logger.Error("Failed to parse expression",
+			zap.String("expression", expression),
+			zap.Error(err))
+		// Default to deny if expression is invalid
+		return false
+	}
+
+	// Evaluate the expression
+	result, err := expr.Evaluate(parameters)
+	if err != nil {
+		logger.Error("Failed to evaluate expression",
+			zap.String("expression", expression),
+			zap.Error(err))
+		// Default to deny if evaluation fails
+		return false
+	}
+
+	// Convert result to boolean
+	boolResult, ok := result.(bool)
+	if !ok {
+		logger.Warn("Expression did not evaluate to boolean",
+			zap.String("expression", expression),
+			zap.Any("result", result))
+		// Default to deny if result is not boolean
+		return false
+	}
+
+	logger.Debug("Expression evaluation result",
+		zap.String("expression", expression),
+		zap.Bool("result", boolResult))
+
+	return boolResult
 }
 
 // GetUserPermissions gets all permissions for a user
@@ -435,7 +486,7 @@ func (s *permissionService) GetUserPermissions(ctx context.Context, userID uint)
 	}
 
 	var permissions []*PermissionInfo
-	
+
 	for _, role := range roles {
 		rolePerms, err := s.GetRolePermissions(ctx, role.ID)
 		if err != nil {
@@ -456,7 +507,7 @@ func (s *permissionService) GetRolePermissions(ctx context.Context, roleID uint)
 	}
 
 	var result []*PermissionInfo
-	
+
 	for _, permission := range permissions {
 		if permission.Status != 1 {
 			continue
@@ -627,12 +678,12 @@ func (s *permissionService) LogPermissionCheck(ctx context.Context, userID uint,
 
 	// Create audit log
 	auditLog := &model.PermissionAuditLog{
-		UserID:       userID,
-		ResourceID:   resourceObj.ID,
-		ActionID:     actionObj.ID,
-		Operation:    "check",
-		Result:       result,
-		Reason:       reason,
+		UserID:     userID,
+		ResourceID: resourceObj.ID,
+		ActionID:   actionObj.ID,
+		Operation:  "check",
+		Result:     result,
+		Reason:     reason,
 	}
 
 	// Add context if available

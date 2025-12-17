@@ -44,14 +44,25 @@ func RequestLoggerMiddleware() gin.HandlerFunc {
 		// Read request body for logging (limit size to avoid memory issues)
 		var requestBody []byte
 		if c.Request.Body != nil && c.Request.Method != "GET" && c.Request.Method != "HEAD" {
-			requestBody, _ = io.ReadAll(io.LimitReader(c.Request.Body, 1024*1024)) // Limit to 1MB
-			c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+			var err error
+			requestBody, err = io.ReadAll(io.LimitReader(c.Request.Body, 1024*1024)) // Limit to 1MB
+			if err != nil {
+				logger.NewStructuredLogger().
+					WithField("path", c.Request.URL.Path).
+					WithField("method", c.Request.Method).
+					WithError(err).
+					Error("Failed to read request body")
+				// Continue with empty request body
+				requestBody = nil
+			} else {
+				c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+			}
 		}
 
 		// Wrap response writer to capture response
 		w := &ResponseWriter{
 			ResponseWriter: c.Writer,
-			body:          bytes.NewBufferString(""),
+			body:           bytes.NewBufferString(""),
 		}
 		c.Writer = w
 
@@ -125,7 +136,7 @@ func RequestLoggerMiddleware() gin.HandlerFunc {
 		default:
 			logger.Info(fmt.Sprintf("Request: %s %s - %d (%s)", method, path, statusCode, latency))
 		}
-		
+
 		// Don't log metrics separately to avoid duplicate logs
 		// The structured log above already contains all necessary information
 	}
@@ -137,7 +148,7 @@ func maskSensitiveData(data string) string {
 	// This masks common password field names
 	masked := data
 	passwordFields := []string{"\"password\":\"", "\"pwd\":\"", "\"pass\":\""}
-	
+
 	for _, field := range passwordFields {
 		start := 0
 		for {
@@ -145,20 +156,20 @@ func maskSensitiveData(data string) string {
 			if idx == -1 {
 				break
 			}
-			
+
 			// Find the end of the password value
 			valueStart := idx + len(field)
 			endQuote := findSubstring(masked, "\"", valueStart)
 			if endQuote == -1 {
 				break
 			}
-			
+
 			// Replace the password value with asterisks
 			masked = masked[:valueStart] + "*****" + masked[endQuote:]
 			start = valueStart + 6 // Move past the masked password
 		}
 	}
-	
+
 	return masked
 }
 
@@ -167,12 +178,12 @@ func findSubstring(s, substr string, start int) int {
 	if start >= len(s) {
 		return -1
 	}
-	
+
 	for i := start; i <= len(s)-len(substr); i++ {
 		if s[i:i+len(substr)] == substr {
 			return i
 		}
 	}
-	
+
 	return -1
 }
