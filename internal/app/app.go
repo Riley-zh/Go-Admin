@@ -87,8 +87,12 @@ func Run() error {
 	router.Use(rateLimiter.Limit())
 	router.Use(middleware.TransactionMiddleware(transactionManager))
 
+	// Initialize optimized API components
+	initializeOptimizedAPI(router)
+
 	// Register routes
 	registerRoutes(router, metricsCollector)
+	registerOptimizedRoutes(router)
 
 	// Create HTTP server
 	srv := &http.Server{

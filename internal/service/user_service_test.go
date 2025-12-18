@@ -69,6 +69,24 @@ func (m *MockUserRepository) ListWithRoles(page, pageSize int) ([]*model.UserWit
 	return args.Get(0).([]*model.UserWithRoles), int64(args.Int(1)), args.Error(2)
 }
 
+func (m *MockUserRepository) Count() (int64, error) {
+	args := m.Called()
+	return int64(args.Int(0)), args.Error(1)
+}
+
+func (m *MockUserRepository) Exists(id uint) (bool, error) {
+	args := m.Called(id)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockUserRepository) GetByName(name string) (*model.User, error) {
+	args := m.Called(name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*model.User), args.Error(1)
+}
+
 func TestUserService_CreateUser(t *testing.T) {
 	// Create a mock user repository
 	mockRepo := new(MockUserRepository)

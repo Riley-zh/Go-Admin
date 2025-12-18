@@ -31,6 +31,16 @@ func (u *User) GetStatus() int {
 	return u.Status
 }
 
+// SetName sets the name of the user (username)
+func (u *User) SetName(name string) {
+	u.Username = name
+}
+
+// GetName returns the name of the user (username)
+func (u *User) GetName() string {
+	return u.Username
+}
+
 // UserWithRoles represents a user with their roles
 type UserWithRoles struct {
 	User

@@ -8,6 +8,7 @@ import (
 
 // UserService defines the user service interface
 type UserService interface {
+	BaseService[*model.User]
 	CreateUser(username, password, email, nickname string) (*model.User, error)
 	GetUserByID(id uint) (*model.User, error)
 	GetUserByUsername(username string) (*model.User, error)
@@ -20,13 +21,15 @@ type UserService interface {
 
 // userService implements UserService interface
 type userService struct {
+	BaseService[*model.User]
 	userRepo repository.UserRepository
 }
 
 // NewUserService creates a new user service
 func NewUserService() UserService {
 	return &userService{
-		userRepo: repository.NewUserRepository(),
+		BaseService: NewBaseService(&model.User{}),
+		userRepo:    repository.NewUserRepository(),
 	}
 }
 

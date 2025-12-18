@@ -3,7 +3,7 @@ package handler
 import (
 	"go-admin/internal/model"
 	"go-admin/internal/service"
-	"go-admin/pkg/common"
+	"go-admin/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -212,7 +212,7 @@ func (h *RoleHandler) DeleteRole(c *gin.Context) {
 // @Router /roles [get]
 func (h *RoleHandler) ListRoles(c *gin.Context) {
 	// Get pagination parameters
-	pagination := common.GetPaginationParams(c)
+	pagination := response.GetPaginationParams(c)
 
 	// List roles
 	roles, total, err := h.roleService.ListRoles(pagination.Page, pagination.PageSize)

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"go-admin/internal/database"
 	"go-admin/internal/model"
 
 	"gorm.io/gorm"
@@ -14,7 +15,7 @@ type NotificationRepository struct {
 // NewNotificationRepository creates a new notification repository
 func NewNotificationRepository() *NotificationRepository {
 	return &NotificationRepository{
-		db: GetDB(),
+		db: database.GetDB(),
 	}
 }
 

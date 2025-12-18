@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"go-admin/internal/database"
 	"go-admin/internal/model"
 
 	"gorm.io/gorm"
@@ -14,7 +15,7 @@ type FileRepository struct {
 // NewFileRepository creates a new file repository
 func NewFileRepository() *FileRepository {
 	return &FileRepository{
-		db: GetDB(),
+		db: database.GetDB(),
 	}
 }
 

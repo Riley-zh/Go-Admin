@@ -1,6 +1,7 @@
 package service
 
 import (
+	"go-admin/internal/database"
 	"go-admin/internal/model"
 	"go-admin/internal/repository"
 	"go-admin/pkg/errors"
@@ -8,6 +9,7 @@ import (
 
 // RoleService defines the role service interface
 type RoleService interface {
+	BaseService[*model.Role]
 	CreateRole(name, description string) (*model.Role, error)
 	GetRoleByID(id uint) (*model.Role, error)
 	GetRoleByName(name string) (*model.Role, error)
@@ -21,6 +23,7 @@ type RoleService interface {
 
 // roleService implements RoleService interface
 type roleService struct {
+	BaseService[*model.Role]
 	roleRepo repository.RoleRepository
 	userRepo repository.UserRepository
 }
@@ -28,8 +31,9 @@ type roleService struct {
 // NewRoleService creates a new role service
 func NewRoleService() RoleService {
 	return &roleService{
-		roleRepo: repository.NewRoleRepository(),
-		userRepo: repository.NewUserRepository(),
+		BaseService: NewBaseService(&model.Role{}),
+		roleRepo:    repository.NewRoleRepository(),
+		userRepo:    repository.NewUserRepository(),
 	}
 }
 
@@ -61,74 +65,35 @@ func (s *roleService) CreateRole(name, description string) (*model.Role, error) 
 
 // GetRoleByID gets a role by ID
 func (s *roleService) GetRoleByID(id uint) (*model.Role, error) {
-	role, err := s.roleRepo.GetByID(id)
+	role, err := s.BaseService.GetByID(id)
 	if err != nil {
 		return nil, err
 	}
-	if role == nil {
-		return nil, errors.NotFound("Role not found", "角色不存在")
-	}
-
 	return role, nil
 }
 
 // GetRoleByName gets a role by name
 func (s *roleService) GetRoleByName(name string) (*model.Role, error) {
-	role, err := s.roleRepo.GetByName(name)
+	entity, err := s.BaseService.GetByName(name)
 	if err != nil {
 		return nil, err
 	}
-	if role == nil {
-		return nil, errors.NotFound("Role not found", "角色不存在")
-	}
-
-	return role, nil
+	return entity, nil
 }
 
 // UpdateRole updates a role
 func (s *roleService) UpdateRole(role *model.Role) error {
-	// Check if role exists
-	existingRole, err := s.roleRepo.GetByID(role.ID)
-	if err != nil {
-		return err
-	}
-	if existingRole == nil {
-		return errors.NotFound("Role not found", "角色不存在")
-	}
-
-	// Check if role name already exists (excluding current role)
-	if role.Name != existingRole.Name {
-		otherRole, err := s.roleRepo.GetByName(role.Name)
-		if err != nil {
-			return err
-		}
-		if otherRole != nil {
-			return errors.Conflict("Role name already exists", "角色名称已存在")
-		}
-	}
-
-	// Update role
-	return s.roleRepo.Update(role)
+	return s.BaseService.Update(role)
 }
 
 // DeleteRole deletes a role
 func (s *roleService) DeleteRole(id uint) error {
-	// Check if role exists
-	existingRole, err := s.roleRepo.GetByID(id)
-	if err != nil {
-		return err
-	}
-	if existingRole == nil {
-		return errors.NotFound("Role not found", "角色不存在")
-	}
-
-	// Delete role
-	return s.roleRepo.Delete(id)
+	return s.BaseService.Delete(id)
 }
 
 // ListRoles lists roles with pagination
 func (s *roleService) ListRoles(page, pageSize int) ([]*model.Role, int64, error) {
-	return s.roleRepo.List(page, pageSize)
+	return s.BaseService.List(page, pageSize)
 }
 
 // AssignRoleToUser assigns a role to a user
@@ -161,7 +126,7 @@ func (s *roleService) AssignRoleToUser(userID, roleID uint) error {
 		RoleID: roleID,
 	}
 
-	db := repository.GetDB()
+	db := database.GetDB()
 	err = db.Create(userRole).Error
 	if err != nil {
 		// Check if it's a duplicate entry error
@@ -193,7 +158,7 @@ func (s *roleService) RemoveRoleFromUser(userID, roleID uint) error {
 	}
 
 	// Delete user-role relationship
-	db := repository.GetDB()
+	db := database.GetDB()
 	result := db.Where("user_id = ? AND role_id = ?", userID, roleID).Delete(&model.UserRole{})
 	if result.Error != nil {
 		return result.Error

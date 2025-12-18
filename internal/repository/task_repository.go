@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"go-admin/internal/database"
 	"go-admin/internal/model"
 
 	"gorm.io/gorm"
@@ -14,7 +15,7 @@ type TaskRepository struct {
 // NewTaskRepository creates a new task repository
 func NewTaskRepository() *TaskRepository {
 	return &TaskRepository{
-		db: GetDB(),
+		db: database.GetDB(),
 	}
 }
 

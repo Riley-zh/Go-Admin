@@ -3,7 +3,7 @@ package handler
 import (
 	"go-admin/internal/model"
 	"go-admin/internal/service"
-	"go-admin/pkg/common"
+	"go-admin/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -137,7 +137,7 @@ func (h *PermissionHandler) DeletePermission(c *gin.Context) {
 // ListPermissions handles listing permissions with pagination
 func (h *PermissionHandler) ListPermissions(c *gin.Context) {
 	// Get pagination parameters
-	pagination := common.GetPaginationParams(c)
+	pagination := response.GetPaginationParams(c)
 
 	// List permissions
 	permissions, total, err := h.permissionService.ListPermissions(pagination.Page, pagination.PageSize)

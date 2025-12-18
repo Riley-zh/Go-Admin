@@ -28,6 +28,16 @@ func (r *Role) GetStatus() int {
 	return r.Status
 }
 
+// SetName sets the name of the role
+func (r *Role) SetName(name string) {
+	r.Name = name
+}
+
+// GetName returns the name of the role
+func (r *Role) GetName() string {
+	return r.Name
+}
+
 // TableName specifies the table name
 func (Role) TableName() string {
 	return "roles"
