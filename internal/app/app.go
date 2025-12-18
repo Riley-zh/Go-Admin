@@ -17,6 +17,7 @@ import (
 	"go-admin/internal/logger"
 	"go-admin/internal/metrics"
 	"go-admin/internal/middleware"
+	mw "go-admin/pkg/middleware"
 
 	_ "go-admin/docs" // This line is important for go-swagger to find your docs!
 
@@ -86,6 +87,7 @@ func Run() error {
 	router.Use(middleware.MetricsMiddleware(metricsCollector))
 	router.Use(rateLimiter.Limit())
 	router.Use(middleware.TransactionMiddleware(transactionManager))
+	router.Use(mw.SecurityHeadersMiddleware())
 
 	// Initialize optimized API components
 	initializeOptimizedAPI(router)

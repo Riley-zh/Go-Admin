@@ -18,9 +18,9 @@ import (
 // AuthService defines the auth service interface
 type AuthService interface {
 	Register(username, password, email, nickname string) (*model.User, error)
-	Login(username, password string) (string, *model.User, error)
+	Login(username, password string, clientIP, userAgent string) (string, *model.User, error)
 	Logout(tokenString string) error
-	RefreshToken(tokenString string) (string, error)
+	RefreshToken(tokenString string, clientIP, userAgent string) (string, error)
 	GetUserByToken(tokenString string) (*model.User, error)
 	ValidateToken(tokenString string) (*jwt.Token, error)
 }
@@ -32,9 +32,12 @@ type authService struct {
 
 // AuthClaims represents the claims in JWT token
 type AuthClaims struct {
-	UserID   uint   `json:"user_id"`
-	Username string `json:"username"`
-	ID       string `json:"jti,omitempty"` // JWT ID for token identification and blacklisting
+	UserID     uint   `json:"user_id"`
+	Username   string `json:"username"`
+	ClientIP   string `json:"client_ip,omitempty"`
+	UserAgent  string `json:"user_agent,omitempty"`
+	IssuedAtIP string `json:"issued_at_ip,omitempty"`
+	ID         string `json:"jti,omitempty"` // JWT ID for token identification and blacklisting
 	jwt.RegisteredClaims
 }
 
@@ -92,7 +95,7 @@ func (s *authService) Register(username, password, email, nickname string) (*mod
 }
 
 // Login authenticates a user and generates JWT token
-func (s *authService) Login(username, password string) (string, *model.User, error) {
+func (s *authService) Login(username, password string, clientIP, userAgent string) (string, *model.User, error) {
 	// Get user by username
 	user, err := s.userRepo.GetByUsername(username)
 	if err != nil {
@@ -109,7 +112,7 @@ func (s *authService) Login(username, password string) (string, *model.User, err
 	}
 
 	// Generate JWT token
-	token, err := s.generateToken(user)
+	token, err := s.generateToken(user, clientIP, userAgent)
 	if err != nil {
 		return "", nil, err
 	}
@@ -172,7 +175,7 @@ func (s *authService) Logout(tokenString string) error {
 }
 
 // RefreshToken generates a new token based on the old token
-func (s *authService) RefreshToken(tokenString string) (string, error) {
+func (s *authService) RefreshToken(tokenString string, clientIP, userAgent string) (string, error) {
 	// Validate token
 	token, err := s.ValidateToken(tokenString)
 	if err != nil {
@@ -198,6 +201,15 @@ func (s *authService) RefreshToken(tokenString string) (string, error) {
 		}
 	}
 
+	// Check if token was issued from a different IP
+	if claims.IssuedAtIP != "" && clientIP != "" && claims.IssuedAtIP != clientIP {
+		logger.Warn("Token IP mismatch detected",
+			zap.String("issued_ip", claims.IssuedAtIP),
+			zap.String("current_ip", clientIP))
+		// 可选：拒绝来自不同IP的令牌
+		// return "", errors.New("token was issued from a different IP address")
+	}
+
 	// Get user
 	user, err := s.userRepo.GetByID(claims.UserID)
 	if err != nil {
@@ -208,7 +220,7 @@ func (s *authService) RefreshToken(tokenString string) (string, error) {
 	}
 
 	// Generate new token
-	newToken, err := s.generateToken(user)
+	newToken, err := s.generateToken(user, clientIP, userAgent)
 	if err != nil {
 		return "", err
 	}
@@ -294,14 +306,17 @@ func (s *authService) ValidateToken(tokenString string) (*jwt.Token, error) {
 }
 
 // generateToken generates JWT token for a user
-func (s *authService) generateToken(user *model.User) (string, error) {
+func (s *authService) generateToken(user *model.User, clientIP, userAgent string) (string, error) {
 	// Generate a unique JWT ID for token identification and blacklisting
 	jti := utils.GenerateUUID()
 
 	claims := AuthClaims{
-		UserID:   user.ID,
-		Username: user.Username,
-		ID:       jti, // Add JWT ID for token tracking and blacklisting
+		UserID:     user.ID,
+		Username:   user.Username,
+		ClientIP:   clientIP,
+		UserAgent:  userAgent,
+		IssuedAtIP: clientIP, // 记录签发时的IP地址
+		ID:         jti,      // Add JWT ID for token tracking and blacklisting
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

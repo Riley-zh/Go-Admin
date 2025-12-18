@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"go-admin/pkg/api"
-	"go-admin/pkg/httpclient"
 	"go-admin/pkg/jsonutils"
 	"go-admin/pkg/validation"
 
@@ -17,13 +16,13 @@ import (
 // OptimizedAPIMiddleware provides optimized API handling with efficient JSON processing
 type OptimizedAPIMiddleware struct {
 	apiClient *api.APIClient
-	validator *validation.Validator
+	validator *validation.ValidationMiddleware
 }
 
 // NewOptimizedAPIMiddleware creates a new optimized API middleware
 func NewOptimizedAPIMiddleware(config *api.Config) *OptimizedAPIMiddleware {
 	apiClient := api.NewAPIClient(config)
-	validator := validation.NewValidator(apiClient.GetHTTPClient())
+	validator := validation.NewValidationMiddleware()
 
 	return &OptimizedAPIMiddleware{
 		apiClient: apiClient,
@@ -84,11 +83,11 @@ func GetAPIClient(c *gin.Context) *api.APIClient {
 }
 
 // GetValidator retrieves the validator from the context
-func GetValidator(c *gin.Context) *validation.Validator {
+func GetValidator(c *gin.Context) *validation.ValidationMiddleware {
 	if validator, exists := c.Get("validator"); exists {
-		return validator.(*validation.Validator)
+		return validator.(*validation.ValidationMiddleware)
 	}
-	return validation.NewValidator(httpclient.NewClient(nil))
+	return validation.NewValidationMiddleware()
 }
 
 // RequestValidationMiddleware provides request validation
@@ -106,7 +105,7 @@ func RequestValidationMiddleware(validationTarget interface{}) gin.HandlerFunc {
 			return
 		}
 
-		if err := validator.Validate(validationTarget); err != nil {
+		if err := validator.ValidateStruct(validationTarget); err != nil {
 			c.JSON(400, gin.H{
 				"error":   "Validation failed",
 				"details": err.Error(),

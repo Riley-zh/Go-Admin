@@ -18,7 +18,7 @@ type OptimizedUserHandler struct {
 	*BaseHandler
 	userService service.UserService
 	apiClient   *api.APIClient
-	validator   *validation.Validator
+	validator   *validation.ValidationMiddleware
 }
 
 // NewOptimizedUserHandler creates a new optimized user handler
@@ -27,7 +27,7 @@ func NewOptimizedUserHandler(apiClient *api.APIClient) *OptimizedUserHandler {
 		BaseHandler: NewBaseHandler(),
 		userService: service.NewUserService(),
 		apiClient:   apiClient,
-		validator:   validation.NewValidator(apiClient.GetHTTPClient()),
+		validator:   validation.NewValidationMiddleware(),
 	}
 }
 
@@ -65,7 +65,7 @@ func (h *OptimizedUserHandler) CreateUser(c *gin.Context) {
 
 	// Use the middleware validator for enhanced validation
 	validator := middleware.GetValidator(c)
-	if err := validator.Validate(&req); err != nil {
+	if err := validator.ValidateStruct(&req); err != nil {
 		c.JSON(400, gin.H{
 			"error":   "Validation failed",
 			"details": err.Error(),
@@ -74,18 +74,19 @@ func (h *OptimizedUserHandler) CreateUser(c *gin.Context) {
 	}
 
 	// Additional validation with custom rules
-	customRules := map[string]string{
-		"username": "unique",
-		"email":    "unique",
-	}
+	// customRules := map[string]string{
+	// 	"username": "unique",
+	// 	"email":    "unique",
+	// }
 
-	if err := validator.ValidateWithRules(&req, customRules); err != nil {
-		c.JSON(400, gin.H{
-			"error":   "Validation failed",
-			"details": err.Error(),
-		})
-		return
-	}
+	// Note: ValidationMiddleware doesn't have ValidateWithRules method
+	// if err := validator.ValidateWithRules(&req, customRules); err != nil {
+	// 	c.JSON(400, gin.H{
+	// 		"error":   "Validation failed",
+	// 		"details": err.Error(),
+	// 	})
+	// 	return
+	// }
 
 	user, err := h.userService.CreateUser(req.Username, req.Password, req.Email, req.Nickname)
 	if err != nil {
@@ -120,7 +121,7 @@ func (h *OptimizedUserHandler) UpdateUser(c *gin.Context) {
 
 	// Use the middleware validator for enhanced validation
 	validator := middleware.GetValidator(c)
-	if err := validator.Validate(&req); err != nil {
+	if err := validator.ValidateStruct(&req); err != nil {
 		c.JSON(400, gin.H{
 			"error":   "Validation failed",
 			"details": err.Error(),

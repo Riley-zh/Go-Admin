@@ -17,6 +17,7 @@ import (
 var (
 	logger       *zap.Logger
 	sugar        *zap.SugaredLogger
+	asyncLogger  *AsyncLogger
 	currentLevel zapcore.Level
 )
 
@@ -29,17 +30,17 @@ func Init(cfg config.LogConfig) error {
 
 	// Configure encoder for standard human-readable output
 	encoderConfig := zapcore.EncoderConfig{
-		TimeKey:        "time",
-		LevelKey:       "level",
-		NameKey:        "logger",
-		CallerKey:      "caller",
-		MessageKey:     "msg",
-		StacktraceKey:  "stacktrace",
-		LineEnding:     zapcore.DefaultLineEnding,
-		EncodeLevel:    zapcore.CapitalColorLevelEncoder, // 使用带颜色的大写级别
-		EncodeTime:     zapcore.ISO8601TimeEncoder,
-		EncodeDuration: zapcore.StringDurationEncoder,
-		EncodeCaller:   zapcore.ShortCallerEncoder,
+		TimeKey:          "time",
+		LevelKey:         "level",
+		NameKey:          "logger",
+		CallerKey:        "caller",
+		MessageKey:       "msg",
+		StacktraceKey:    "stacktrace",
+		LineEnding:       zapcore.DefaultLineEnding,
+		EncodeLevel:      zapcore.CapitalColorLevelEncoder, // 使用带颜色的大写级别
+		EncodeTime:       zapcore.ISO8601TimeEncoder,
+		EncodeDuration:   zapcore.StringDurationEncoder,
+		EncodeCaller:     zapcore.ShortCallerEncoder,
 		ConsoleSeparator: " ", // 使用空格作为分隔符
 	}
 
@@ -91,16 +92,24 @@ func Init(cfg config.LogConfig) error {
 	logger = zap.New(core, zap.AddCaller(), zap.AddCallerSkip(1))
 	sugar = logger.Sugar()
 
+	// Initialize async logger
+	asyncConfig := DefaultAsyncLogConfig()
+	asyncLogger = NewAsyncLogger(logger, asyncConfig)
+
 	return nil
 }
 
 // Sync flushes any buffered log entries
 func Sync() {
-	if logger != nil {
-		logger.Sync()
-	}
-	if sugar != nil {
-		sugar.Sync()
+	if asyncLogger != nil {
+		asyncLogger.Close()
+	} else {
+		if logger != nil {
+			logger.Sync()
+		}
+		if sugar != nil {
+			sugar.Sync()
+		}
 	}
 }
 
@@ -140,35 +149,45 @@ func SetLevel(levelStr string) error {
 
 // Debug logs a debug message
 func Debug(msg string, fields ...zap.Field) {
-	if logger != nil {
+	if asyncLogger != nil {
+		asyncLogger.Log(zapcore.DebugLevel, msg, fields...)
+	} else if logger != nil {
 		logger.Debug(msg, fields...)
 	}
 }
 
 // Info logs an info message
 func Info(msg string, fields ...zap.Field) {
-	if logger != nil {
+	if asyncLogger != nil {
+		asyncLogger.Log(zapcore.InfoLevel, msg, fields...)
+	} else if logger != nil {
 		logger.Info(msg, fields...)
 	}
 }
 
 // Warn logs a warning message
 func Warn(msg string, fields ...zap.Field) {
-	if logger != nil {
+	if asyncLogger != nil {
+		asyncLogger.Log(zapcore.WarnLevel, msg, fields...)
+	} else if logger != nil {
 		logger.Warn(msg, fields...)
 	}
 }
 
 // Error logs an error message
 func Error(msg string, fields ...zap.Field) {
-	if logger != nil {
+	if asyncLogger != nil {
+		asyncLogger.Log(zapcore.ErrorLevel, msg, fields...)
+	} else if logger != nil {
 		logger.Error(msg, fields...)
 	}
 }
 
 // Fatal logs a fatal message and exits
 func Fatal(msg string, fields ...zap.Field) {
-	if logger != nil {
+	if asyncLogger != nil {
+		asyncLogger.Log(zapcore.FatalLevel, msg, fields...)
+	} else if logger != nil {
 		logger.Fatal(msg, fields...)
 	}
 }

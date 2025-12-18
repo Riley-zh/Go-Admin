@@ -84,7 +84,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	// Authenticate user
-	token, user, err := h.authService.Login(req.Username, req.Password)
+	clientIP := c.ClientIP()
+	userAgent := c.GetHeader("User-Agent")
+	token, user, err := h.authService.Login(req.Username, req.Password, clientIP, userAgent)
 	if err != nil {
 		h.HandleError(c, err)
 		return
@@ -152,7 +154,9 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	tokenString := authHeader[len("Bearer "):]
 
 	// Refresh token
-	newToken, err := h.authService.RefreshToken(tokenString)
+	clientIP := c.ClientIP()
+	userAgent := c.GetHeader("User-Agent")
+	newToken, err := h.authService.RefreshToken(tokenString, clientIP, userAgent)
 	if err != nil {
 		h.HandleError(c, err)
 		return

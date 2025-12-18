@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -48,6 +49,30 @@ func (l *StructuredLogger) WithContext(ctx context.Context) *StructuredLogger {
 	if traceID := ctx.Value("traceID"); traceID != nil {
 		l.fields["traceID"] = traceID
 	}
+	return l
+}
+
+// WithGinContext 从Gin上下文中提取信息
+func (l *StructuredLogger) WithGinContext(c *gin.Context) *StructuredLogger {
+	if c == nil {
+		return l
+	}
+
+	// 提取请求ID
+	if requestID := c.GetString("requestID"); requestID != "" {
+		l.fields["request_id"] = requestID
+	}
+
+	// 提取用户ID
+	if userID, exists := c.Get("userID"); exists {
+		l.fields["user_id"] = userID
+	}
+
+	// 提取请求信息
+	l.fields["client_ip"] = c.ClientIP()
+	l.fields["method"] = c.Request.Method
+	l.fields["path"] = c.Request.URL.Path
+
 	return l
 }
 
