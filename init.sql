@@ -171,7 +171,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 
 -- Insert default admin user (password: admin123)
 INSERT INTO users (username, password, email, nickname, status) VALUES 
-('admin', '$2a$10$w9.XezbxFMRgyjfE45J44.wEd0QHyv44.EIYZFvzCoZF5OhP9L5nG', 'admin@example.com', 'Administrator', 1);
+('admin', '$2a$10$T/ty8U1HyMlUCXYZ9aOrVO25vQwvFvO0.Jv2uag47xhFD2p1deZR2', 'admin@example.com', 'Administrator', 1);
 
 -- Insert default roles
 INSERT INTO roles (name, description, status) VALUES 

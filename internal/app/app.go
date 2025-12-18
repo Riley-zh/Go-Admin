@@ -80,6 +80,7 @@ func Run() error {
 	router := gin.New()
 
 	// Add middlewares
+	router.Use(middleware.CORSMiddleware())
 	router.Use(middleware.NewRecoveryMiddleware().Handle())
 	router.Use(middleware.RequestLoggerMiddleware())
 	router.Use(middleware.NewErrorHandlerMiddleware().Handle())
